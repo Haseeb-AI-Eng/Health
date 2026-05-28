@@ -290,8 +290,7 @@ const DoctorLogin = ({ onLoginSuccess }) => {
             </a>
           </div>
         </div>
-      </motion.div>
-      
+      </motion.div>   
 
       <style>{`
         @keyframes blob {
