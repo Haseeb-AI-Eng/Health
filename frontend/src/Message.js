@@ -62,32 +62,32 @@ const Message = ({ message, onDownloadPDF }) => {
       } else if (riskScore >= 55) {
         // GOOD - Works but not ideal
         return {
-          bg: 'bg-gradient-to-br from-yellow-50 via-amber-50 to-lime-50',
-          border: 'border-yellow-500',
-          header: 'bg-gradient-to-r from-yellow-500 via-amber-500 to-lime-500',
-          headerGlow: 'shadow-yellow-500/50',
-          text: 'text-yellow-900',
-          icon: 'text-yellow-700',
-          badge: 'bg-gradient-to-r from-yellow-200 to-amber-200 text-yellow-900',
-          accent: 'from-yellow-500 to-lime-500',
-          ring: 'ring-yellow-400',
+          bg: 'bg-gradient-to-br from-teal-50 via-teal-50 to-teal-50',
+          border: 'border-teal-500',
+          header: 'bg-gradient-to-r from-teal-500 via-teal-500 to-teal-500',
+          headerGlow: 'shadow-teal-500/50',
+          text: 'text-teal-900',
+          icon: 'text-teal-700',
+          badge: 'bg-gradient-to-r from-teal-200 to-teal-200 text-teal-900',
+          accent: 'from-teal-500 to-teal-500',
+          ring: 'ring-teal-400',
           scoreLabel: '✓ GOOD - Works But Not First-Line',
-          scoreColor: 'text-yellow-700',
+          scoreColor: 'text-teal-700',
         };
       } else if (riskScore >= 40) {
         // ACCEPTABLE - Needs monitoring
         return {
-          bg: 'bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50',
-          border: 'border-amber-500',
-          header: 'bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500',
-          headerGlow: 'shadow-amber-500/50',
-          text: 'text-orange-900',
-          icon: 'text-orange-700',
-          badge: 'bg-gradient-to-r from-amber-200 to-orange-200 text-orange-900',
-          accent: 'from-amber-500 to-orange-500',
-          ring: 'ring-amber-400',
+          bg: 'bg-gradient-to-br from-teal-50 via-teal-50 to-teal-50',
+          border: 'border-teal-500',
+          header: 'bg-gradient-to-r from-teal-500 via-teal-500 to-teal-500',
+          headerGlow: 'shadow-teal-500/50',
+          text: 'text-teal-900',
+          icon: 'text-teal-700',
+          badge: 'bg-gradient-to-r from-teal-200 to-teal-200 text-teal-900',
+          accent: 'from-teal-500 to-teal-500',
+          ring: 'ring-teal-400',
           scoreLabel: '⚠️ ACCEPTABLE - Monitor Closely',
-          scoreColor: 'text-orange-700',
+          scoreColor: 'text-teal-700',
         };
       } else if (riskScore >= 25) {
         // CONCERNING - Wrong drug or significant concerns
@@ -537,7 +537,7 @@ const Message = ({ message, onDownloadPDF }) => {
                           </div>
                           <div className="flex items-center gap-1 text-xs text-emerald-700 font-bold">
                             {[...Array(5)].map((_, i) => (
-                                <FaStar key={i} className={i < alt_med.suggestion_score ? 'text-yellow-400' : 'text-gray-300'} />
+                                <FaStar key={i} className={i < alt_med.suggestion_score ? 'text-teal-400' : 'text-gray-300'} />
                             ))}
                           </div>
                         </motion.div>
@@ -782,14 +782,14 @@ const Message = ({ message, onDownloadPDF }) => {
                 className="flex items-center justify-between pt-4 border-t border-gray-300/50"
               >
                 <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-lg ${analysisData.verification_status === 'SAFE' ? 'bg-gradient-to-br from-green-500 to-emerald-500' : 'bg-gradient-to-br from-yellow-500 to-amber-500'} flex items-center justify-center shadow-md`}>
+                  <div className={`w-8 h-8 rounded-lg ${analysisData.verification_status === 'SAFE' ? 'bg-gradient-to-br from-green-500 to-emerald-500' : 'bg-gradient-to-br from-teal-500 to-teal-500'} flex items-center justify-center shadow-md`}>
                     {analysisData.verification_status === 'SAFE' ? (
                       <FiCheck className="text-white text-lg" />
                     ) : (
                       <FiX className="text-white text-lg" />
                     )}
                   </div>
-                  <span className="text-sm font-bold text-gray-700">Database Verification: <span className={analysisData.verification_status === 'SAFE' ? 'text-green-600' : 'text-yellow-600'}>{analysisData.verification_status}</span></span>
+                  <span className="text-sm font-bold text-gray-700">Database Verification: <span className={analysisData.verification_status === 'SAFE' ? 'text-green-600' : 'text-teal-600'}>{analysisData.verification_status}</span></span>
                 </div>
 
                 {hasPdf && analysisData && (
@@ -960,7 +960,7 @@ const Message = ({ message, onDownloadPDF }) => {
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-gradient-to-r from-red-50 via-orange-50 to-yellow-50 border-2 border-red-300 rounded-2xl p-5 shadow-xl"
+            className="bg-gradient-to-r from-red-50 via-teal-50 to-teal-50 border-2 border-red-300 rounded-2xl p-5 shadow-xl"
           >
             <div className="flex items-center gap-3 mb-4">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500 to-orange-500 flex items-center justify-center shadow-lg">

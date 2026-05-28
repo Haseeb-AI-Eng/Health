@@ -4,6 +4,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.image import MIMEImage
 from typing import Optional
+from datetime import datetime
 import os
 from dotenv import load_dotenv
 
@@ -51,7 +52,7 @@ def get_email_html(name: str, verification_url: str) -> str:
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
         }}
         .header {{
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #c084fc;
             padding: 40px 30px;
             text-align: center;
         }}
@@ -90,7 +91,7 @@ def get_email_html(name: str, verification_url: str) -> str:
         }}
         .verify-button {{
             display: inline-block;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #c084fc;
             color: #ffffff;
             text-decoration: none;
             padding: 16px 40px;
@@ -109,8 +110,8 @@ def get_email_html(name: str, verification_url: str) -> str:
             text-decoration: none;
         }}
         .info-box {{
-            background: #f7fafc;
-            border-left: 4px solid #667eea;
+            background: #fefce8;
+            border-left: 4px solid #a855f7;
             padding: 20px;
             border-radius: 6px;
             margin: 25px 0;
@@ -147,7 +148,7 @@ def get_email_html(name: str, verification_url: str) -> str:
             margin-top: 15px;
         }}
         .footer-links a {{
-            color: #667eea;
+            color: #9333ea;
             text-decoration: none;
             margin: 0 10px;
             font-size: 13px;
@@ -329,8 +330,8 @@ async def send_password_reset_email(email: str, name: str, reset_url: str) -> bo
     <style>
         body {{ font-family: Arial, sans-serif; line-height: 1.6; }}
         .container {{ max-width: 600px; margin: 40px auto; padding: 30px; background: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }}
-        .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }}
-        .button {{ display: inline-block; background: #667eea; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }}
+        .header {{ background: #c084fc; color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }}
+        .button {{ display: inline-block; background: #a855f7; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }}
         .footer {{ margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; color: #888; font-size: 12px; }}
     </style>
 </head>
@@ -384,17 +385,120 @@ async def send_password_reset_email(email: str, name: str, reset_url: str) -> bo
         return False
 
 
+def send_diagnosis_email(patient_email: str, patient_name: str, doctor_name: str, 
+                        diagnosis_summary: str, clinic_name: str = "DiabAssist Clinic") -> bool:
+    """
+    Send diagnosis notification email to patient when doctor performs diagnosis.
+
+    Args:
+        patient_email: Patient's email address
+        patient_name: Patient's name
+        doctor_name: Doctor's name who performed the diagnosis
+        diagnosis_summary: Brief summary of the diagnosis/analysis
+        clinic_name: Name of the clinic/platform
+
+    Returns:
+        bool: True if email sent successfully
+    """
+    print(f"\n📤 send_diagnosis_email called:")
+    print(f"   - To: {patient_email}")
+    print(f"   - Patient: {patient_name}")
+    print(f"   - Doctor: {doctor_name}")
+    print(f"   - EMAIL_HOST_USER: {EMAIL_HOST_USER}")
+    print(f"   - EMAIL_HOST_PASSWORD length: {len(EMAIL_HOST_PASSWORD) if EMAIL_HOST_PASSWORD else 0}")
+    print(f"   - EMAIL_FROM: {EMAIL_FROM}")
+    
+    if not EMAIL_HOST_PASSWORD or EMAIL_HOST_PASSWORD == "your-app-password-here":
+        print(f"⚠️  DEVELOPMENT MODE: Email password not configured!")
+        print(f"   Diagnosis email WOULD be sent to: {patient_email}")
+        print(f"   Doctor: {doctor_name}")
+        print(f"   Summary preview: {diagnosis_summary[:100]}...")
+        return True
+
+    try:
+        print(f"\n🔄 Attempting to connect to SMTP server...")
+        print(f"   - SMTP Host: {EMAIL_HOST}")
+        print(f"   - SMTP Port: {EMAIL_PORT}")
+        print(f"   - Using TLS: {EMAIL_USE_TLS}")
+        
+        # Create message
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = f"Your Medical Consultation Report - DiabAssist"
+        msg["From"] = f"DiabAssist <{EMAIL_FROM}>"
+        msg["To"] = patient_email
+
+        # Create plain text version
+        text_content = f"""
+Dear {patient_name},
+
+Your healthcare provider has completed a medical consultation and analysis.
+
+Consulting Doctor: {doctor_name}
+Clinic: {clinic_name}
+Date: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}
+
+MEDICAL ANALYSIS SUMMARY:
+{diagnosis_summary}
+
+What's Next?
+Please review the analysis summary. If you have any questions or concerns, please contact your healthcare provider.
+
+This email contains private medical information. If you did not expect to receive this, please contact our support team immediately.
+
+Wishing you good health,
+The DiabAssist Team
+
+© 2026 DiabAssist. All rights reserved.
+        """
+
+        part_text = MIMEText(text_content, "plain")
+        msg.attach(part_text)
+
+        # Send email
+        print(f"\n📡 Connecting to SMTP server...")
+        with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT) as server:
+            if EMAIL_USE_TLS:
+                print(f"   - Starting TLS...")
+                server.starttls()
+            print(f"   - Logging in with user: {EMAIL_HOST_USER}")
+            server.login(EMAIL_HOST_USER, EMAIL_HOST_PASSWORD)
+            print(f"   - Login successful! Sending email...")
+            server.sendmail(EMAIL_FROM, patient_email, msg.as_string())
+            print(f"   - Email sent successfully!")
+
+        print(f"\n✅ Diagnosis notification email sent successfully to {patient_email}")
+        return True
+
+    except smtplib.SMTPAuthenticationError as e:
+        print(f"\n❌ SMTP Authentication failed: {str(e)}")
+        print(f"   ⚠️  Your Gmail App Password is INCORRECT or INVALID")
+        print(f"   👉 Please check: https://myaccount.google.com/apppasswords")
+        print(f"   👉 Generate a NEW 16-character app password")
+        print(f"   👉 Update your .env file: EMAIL_HOST_PASSWORD=your-new-password")
+        return False
+    except smtplib.SMTPException as e:
+        print(f"\n❌ SMTP error occurred: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return False
+    except Exception as e:
+        print(f"\n❌ Failed to send diagnosis email: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
 def send_registration_email(patient_email: str, patient_name: str, user_id: str, role: str = "patient", specialization: str = None) -> bool:
     """
     Send welcome email to newly registered patient or doctor.
-    
+
     Args:
         patient_email: User's email address
         patient_name: User's name
         user_id: Generated user ID
         role: User role (patient or doctor)
         specialization: Doctor's specialization (for doctors only)
-    
+
     Returns:
         bool: True if email sent successfully
     """
@@ -435,15 +539,15 @@ def send_registration_email(patient_email: str, patient_name: str, user_id: str,
     <title>Welcome to Elements Interactive</title>
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-        body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; background-color: #f4f7fa; }}
+        body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; background-color: #fefce8; }}
         .container {{ max-width: 600px; margin: 40px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1); }}
-        .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 30px; text-align: center; }}
+        .header {{ background: #c084fc; padding: 40px 30px; text-align: center; }}
         .logo {{ font-size: 32px; font-weight: bold; color: #ffffff; margin-bottom: 10px; }}
         .content {{ padding: 40px 30px; }}
-        .info-box {{ background: #f7fafc; border-left: 4px solid #667eea; padding: 20px; border-radius: 6px; margin: 25px 0; }}
+        .info-box {{ background: #fefce8; border-left: 4px solid #a855f7; padding: 20px; border-radius: 6px; margin: 25px 0; }}
         .id-box {{ background: #fff5f5; border: 2px dashed #fc8181; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0; }}
         .id-number {{ font-size: 24px; font-weight: bold; color: #c53030; font-family: monospace; letter-spacing: 2px; }}
-        .footer {{ background: #f7fafc; padding: 30px; text-align: center; border-top: 1px solid #e2e8f0; }}
+        .footer {{ background: #fefce8; padding: 30px; text-align: center; border-top: 1px solid #e9d5ff; }}
     </style>
 </head>
 <body>

@@ -6,16 +6,22 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any
 import hashlib
 import re
+import os
+from dotenv import load_dotenv
 
 from auth import get_current_user, hash_password, verify_password
+
+load_dotenv()
 
 router = APIRouter(prefix="/api/profile", tags=["Profile"])
 
 # -------------------------
 # MongoDB Setup
 # -------------------------
-client = MongoClient("mongodb://localhost:27017/")
-db = client["local"]
+mongodburl = os.getenv('MONGODB_URL', os.getenv('LOCAL_MONGODB_URL', 'mongodb://localhost:27017/'))
+db_name = os.getenv('MONGODB_LOCAL_DB', 'local')
+client = MongoClient(mongodburl)
+db = client[db_name]
 users_collection = db["users"]
 
 # -------------------------

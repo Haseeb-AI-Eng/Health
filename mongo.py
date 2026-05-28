@@ -2,14 +2,20 @@ from pymongo import MongoClient
 import pandas as pd
 import csv
 import json
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 print("Connecting to MongoDB...")
 
 # connect to MongoDB
-client = MongoClient("mongodb://localhost:27017/")
+mongodburl = os.getenv('MONGODB_URL', os.getenv('LOCAL_MONGODB_URL', 'mongodb://localhost:27017/'))
+db_name = os.getenv('MONGODB_LOCAL_DB', 'local')
+client = MongoClient(mongodburl)
 
 # use database "local"
-db = client["local"]
+db = client[db_name]
 
 # ---------------------------
 # Load datasets
