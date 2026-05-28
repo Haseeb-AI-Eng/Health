@@ -291,6 +291,7 @@ const DoctorLogin = ({ onLoginSuccess }) => {
           </div>
         </div>
       </motion.div>
+      
 
       <style>{`
         @keyframes blob {
