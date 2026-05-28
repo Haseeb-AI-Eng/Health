@@ -429,6 +429,7 @@ const Analytics = ({ patientName, patientEmail }) => {
  icon={<FiActivity className="w-6 h-6 text-white" />}
  color="bg-emerald-500"
  />
+ 
  <StatCard
  title="Unique Diseases"
  value={summary?.uniqueDiseases || 0}
