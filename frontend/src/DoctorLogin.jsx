@@ -292,7 +292,6 @@ const DoctorLogin = ({ onLoginSuccess }) => {
         </div>
       </motion.div>   
 
-
       <style>{`
         @keyframes blob {
           0%, 100% { transform: translate(0, 0) scale(1); }
