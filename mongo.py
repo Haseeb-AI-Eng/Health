@@ -11,7 +11,7 @@ print("Connecting to MongoDB...")
 
 # connect to MongoDB
 mongodburl = os.getenv('MONGODB_URL', os.getenv('LOCAL_MONGODB_URL', 'mongodb://localhost:27017/'))
-db_name = os.getenv('MONGODB_LOCAL_DB', 'local')
+db_name = os.getenv('MONGODB_LOCAL_DB', 'local_data')
 client = MongoClient(mongodburl)
 
 # use database "local"

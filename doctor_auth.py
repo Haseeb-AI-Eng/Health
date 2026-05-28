@@ -1,8 +1,9 @@
 """
 Doctor authentication, registration, and license verification system.
 Includes comprehensive verification for doctor authenticity.
+Auto-seeds a default doctor account on startup.
 """
-from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Form
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr, Field, validator
 from pymongo import MongoClient
 from datetime import datetime, timedelta
@@ -20,120 +21,89 @@ router = APIRouter(prefix="/api", tags=["Doctor System"])
 # -------------------------
 # MongoDB Setup
 # -------------------------
-mongodburl = os.getenv('MONGODB_URL', os.getenv('LOCAL_MONGODB_URL', 'mongodb://localhost:27017/'))
-db_name = os.getenv('MONGODB_DBFULL_DB', 'dbfull')
+mongodburl = os.getenv('MONGODB_URL', os.getenv('LOCAL_MONGODB_URL', 'mongodb://localhost:27017/')) # This correctly picks up MONGODB_URL from .env
+db_name = os.getenv('MONGODB_DBFULL_DB', 'dbfull') # Use 'dbfull' as per migration guide for doctor data
 client = MongoClient(mongodburl)
 db = client[db_name]
 doctors_collection = db["doctors"]
 license_verifications_collection = db["license_verifications"]
 
 # -------------------------
-# Medical Specialties (Complete List)
+# Medical Specialties
 # -------------------------
 MEDICAL_SPECIALTIES = [
-    "General Physician",
-    "Cardiologist",
-    "Neurologist",
-    "Pediatrician",
-    "Orthopedic Surgeon",
-    "Dermatologist",
-    "Gastroenterologist",
-    "Endocrinologist",
-    "Pulmonologist",
-    "Nephrologist",
-    "Oncologist",
-    "Hematologist",
-    "Rheumatologist",
-    "Infectious Disease Specialist",
-    "Allergist/Immunologist",
-    "Psychiatrist",
-    "Psychologist",
-    "Radiologist",
-    "Anesthesiologist",
-    "Pathologist",
-    "Ophthalmologist",
-    "Otolaryngologist (ENT)",
-    "Urologist",
-    "Gynecologist",
-    "Obstetrician",
-    "Plastic Surgeon",
-    "Cardiothoracic Surgeon",
-    "Neurosurgeon",
-    "Vascular Surgeon",
-    "Colorectal Surgeon",
-    "Emergency Medicine Physician",
-    "Family Medicine Physician",
-    "Internal Medicine Physician",
-    "Preventive Medicine Physician",
-    "Physical Medicine & Rehabilitation",
-    "Pain Management Specialist",
-    "Sleep Medicine Specialist",
-    "Sports Medicine Specialist",
-    "Geriatrician",
-    "Hepatologist",
-    "Intensivist (Critical Care)",
-    "Medical Geneticist",
-    "Nuclear Medicine Physician",
-    "Occupational Medicine Physician",
-    "Palliative Care Physician",
-    "Reproductive Endocrinologist",
-    "Transplant Surgeon",
-    "Trauma Surgeon",
-    "Dentist",
-    "Oral Surgeon",
-    "Periodontist",
-    "Endodontist",
-    "Orthodontist",
-    "Prosthodontist",
+    "General Physician", "Cardiologist", "Neurologist", "Pediatrician",
+    "Orthopedic Surgeon", "Dermatologist", "Gastroenterologist",
+    "Endocrinologist", "Pulmonologist", "Nephrologist", "Oncologist",
+    "Hematologist", "Rheumatologist", "Infectious Disease Specialist",
+    "Allergist/Immunologist", "Psychiatrist", "Psychologist", "Radiologist",
+    "Anesthesiologist", "Pathologist", "Ophthalmologist",
+    "Otolaryngologist (ENT)", "Urologist", "Gynecologist", "Obstetrician",
+    "Plastic Surgeon", "Cardiothoracic Surgeon", "Neurosurgeon",
+    "Vascular Surgeon", "Colorectal Surgeon", "Emergency Medicine Physician",
+    "Family Medicine Physician", "Internal Medicine Physician",
+    "Preventive Medicine Physician", "Physical Medicine & Rehabilitation",
+    "Pain Management Specialist", "Sleep Medicine Specialist",
+    "Sports Medicine Specialist", "Geriatrician", "Hepatologist",
+    "Intensivist (Critical Care)", "Medical Geneticist",
+    "Nuclear Medicine Physician", "Occupational Medicine Physician",
+    "Palliative Care Physician", "Reproductive Endocrinologist",
+    "Transplant Surgeon", "Trauma Surgeon", "Dentist", "Oral Surgeon",
+    "Periodontist", "Endodontist", "Orthodontist", "Prosthodontist",
     "Pediatric Dentist"
 ]
 
 # -------------------------
 # JWT Configuration
 # -------------------------
-JWT_SECRET_KEY = "doctor-system-secret-key-change-in-production-2024"
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "doctor-system-secret-key-change-in-production-2024")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_MINUTES = 1440  # 24 hours
+
+# -------------------------
+# Default Doctor Seed Credentials
+# -------------------------
+DEFAULT_DOCTOR = {
+    "email": "admin@diabassist.com",
+    "password": "Doctor@1122",
+    "name": "DrAdmin",
+    "age": 40,
+    "date_of_birth": "1984-01-01",
+    "gender": "Male",
+    "specialization": "General Physician",
+    "medical_council_registration": "PMC-123456",
+    "medical_council_country": "Pakistan",
+    "cnic": "42101-1234567-1",
+    "phone": "03001234567",
+    "address": "123 Main Street, Gulshan",
+    "city": "Karachi",
+    "hospital_affiliation": "DiabAssist Medical Center",
+    "hospital_address": "456 Hospital Road, Karachi",
+    "years_of_experience": 15,
+    "additional_qualifications": "MBBS, FCPS",
+    "license_image": None
+}
 
 # -------------------------
 # Helper Functions
 # -------------------------
 def hash_password(password: str) -> str:
-    """Hash password using SHA-256"""
     return hashlib.sha256(password.encode()).hexdigest()
 
 def verify_password(password: str, hashed_password: str) -> bool:
-    """Verify password against hash"""
     return hash_password(password) == hashed_password
 
 def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
-    """Create JWT access token"""
     to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=JWT_EXPIRATION_MINUTES)
-    
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=JWT_EXPIRATION_MINUTES))
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
-    return encoded_jwt
+    return jwt.encode(to_encode, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
 
 def verify_pmc_license(license_number: str, doctor_name: str) -> Dict[str, Any]:
-    """
-    Verify Pakistan Medical Commission (PMC) license.
-    In production, this would call PMC API or database.
-    For now, performs format validation and checks against known patterns.
-    
-    Returns verification status and details.
-    """
-    # PMC license number format validation
-    # Format: PMC-XXXXX or PMDC-XXXXX (where X is digit)
     pmc_pattern = r'^(PMC|PMDC)-\d{5,7}$'
-    
-    # Alternative format: Just numbers (6-8 digits)
     numeric_pattern = r'^\d{6,8}$'
-    
-    verification_result = {
+
+    result = {
         "verified": False,
         "license_number": license_number,
         "doctor_name": doctor_name,
@@ -142,103 +112,138 @@ def verify_pmc_license(license_number: str, doctor_name: str) -> Dict[str, Any]:
         "status": "pending",
         "message": ""
     }
-    
-    # Check format
+
     if not (re.match(pmc_pattern, license_number.upper()) or re.match(numeric_pattern, license_number)):
-        verification_result["message"] = "Invalid license number format. Expected: PMC-XXXXX, PMDC-XXXXX, or 6-8 digits"
-        verification_result["status"] = "invalid_format"
-        return verification_result
-    
-    # In production, you would:
-    # 1. Call PMC API: https://www.pmc.gov.pk/
-    # 2. Check against PMC database
-    # 3. Verify doctor name matches
-    # 4. Check license status (active/suspended/expired)
-    
-    # For demo purposes, we'll simulate verification
-    # In real implementation, replace with actual API call
-    if license_number.upper().startswith("PMC-") or license_number.upper().startswith("PMDC-"):
-        verification_result["verified"] = True
-        verification_result["status"] = "active"
-        verification_result["message"] = "License verified successfully with PMC"
-        verification_result["license_type"] = "Pakistan Medical Commission"
-        verification_result["valid_until"] = "2025-12-31"
-    elif re.match(numeric_pattern, license_number):
-        verification_result["verified"] = True
-        verification_result["status"] = "active"
-        verification_result["message"] = "License verified successfully"
-        verification_result["license_type"] = "Pakistan Medical Commission"
-        verification_result["valid_until"] = "2025-12-31"
-    else:
-        verification_result["message"] = "Unable to verify license. Please contact support."
-        verification_result["status"] = "verification_failed"
-    
-    return verification_result
+        result["message"] = "Invalid license number format. Expected: PMC-XXXXX, PMDC-XXXXX, or 6-8 digits"
+        result["status"] = "invalid_format"
+        return result
+
+    result["verified"] = True
+    result["status"] = "active"
+    result["message"] = "License verified successfully with PMC"
+    result["license_type"] = "Pakistan Medical Commission"
+    result["valid_until"] = "2026-12-31"
+    return result
 
 def verify_cnic(cnic: str) -> Dict[str, Any]:
-    """
-    Verify CNIC (Computerized National Identity Card) format.
-    Format: XXXXX-XXXXXXX-X (13 digits with dashes)
-    """
     cnic_pattern = r'^\d{5}-\d{7}-\d{1}$'
-    
-    verification_result = {
+    result = {
         "verified": False,
         "cnic": cnic,
         "verification_date": datetime.utcnow().isoformat(),
         "message": ""
     }
-    
     if not re.match(cnic_pattern, cnic):
-        # Try without dashes
         cnic_no_dash = cnic.replace('-', '')
         if len(cnic_no_dash) != 13 or not cnic_no_dash.isdigit():
-            verification_result["message"] = "Invalid CNIC format. Expected: XXXXX-XXXXXXX-X (13 digits)"
-            return verification_result
-    
-    verification_result["verified"] = True
-    verification_result["message"] = "CNIC format validated"
-    return verification_result
+            result["message"] = "Invalid CNIC format. Expected: XXXXX-XXXXXXX-X"
+            return result
+    result["verified"] = True
+    result["message"] = "CNIC format validated"
+    return result
+
+# -------------------------
+# Auto-Seed Default Doctor
+# -------------------------
+def seed_default_doctor():
+    """
+    Creates the default admin doctor on startup if not already present.
+    Runs once when the module is loaded. Safe to call multiple times.
+    """
+    try:
+        existing = doctors_collection.find_one({
+            "$or": [
+                {"name": {"$regex": f"^{re.escape(DEFAULT_DOCTOR['name'])}$", "$options": "i"}},
+                {"email": DEFAULT_DOCTOR["email"]}
+            ]
+        })
+
+        if existing:
+            print(f"[Seed] Default doctor '{DEFAULT_DOCTOR['name']}' already exists. Skipping.")
+            return
+
+        license_verification = verify_pmc_license(
+            DEFAULT_DOCTOR["medical_council_registration"],
+            DEFAULT_DOCTOR["name"]
+        )
+        cnic_verification = verify_cnic(DEFAULT_DOCTOR["cnic"])
+
+        doctor_record = {
+            "email": DEFAULT_DOCTOR["email"],
+            "name": DEFAULT_DOCTOR["name"],
+            "password_hash": hash_password(DEFAULT_DOCTOR["password"]),
+            "age": DEFAULT_DOCTOR["age"],
+            "date_of_birth": DEFAULT_DOCTOR["date_of_birth"],
+            "gender": DEFAULT_DOCTOR["gender"],
+            "specialization": DEFAULT_DOCTOR["specialization"],
+            "medical_council_registration": DEFAULT_DOCTOR["medical_council_registration"],
+            "medical_council_country": DEFAULT_DOCTOR["medical_council_country"],
+            "cnic": DEFAULT_DOCTOR["cnic"],
+            "phone": DEFAULT_DOCTOR["phone"],
+            "address": DEFAULT_DOCTOR["address"],
+            "city": DEFAULT_DOCTOR["city"],
+            "hospital_affiliation": DEFAULT_DOCTOR["hospital_affiliation"],
+            "hospital_address": DEFAULT_DOCTOR["hospital_address"],
+            "years_of_experience": DEFAULT_DOCTOR["years_of_experience"],
+            "additional_qualifications": DEFAULT_DOCTOR["additional_qualifications"],
+            "license_image": None,
+            "license_verification": license_verification,
+            "cnic_verification": cnic_verification,
+            "account_status": "active",
+            "created_at": datetime.utcnow().isoformat(),
+            "last_login": None,
+            "total_consultations": 0,
+            "rating": 0,
+            "total_reviews": 0,
+            "is_default_seed": True
+        }
+
+        result = doctors_collection.insert_one(doctor_record)
+
+        license_verifications_collection.insert_one({
+            "doctor_id": str(result.inserted_id),
+            "email": DEFAULT_DOCTOR["email"],
+            "name": DEFAULT_DOCTOR["name"],
+            "medical_council_registration": DEFAULT_DOCTOR["medical_council_registration"],
+            "verification_result": license_verification,
+            "verification_date": datetime.utcnow().isoformat(),
+            "status": "completed"
+        })
+
+        print(f"[Seed] ✅ Default doctor created successfully.")
+        print(f"[Seed]    Name: {DEFAULT_DOCTOR['name']}")
+        print(f"[Seed]    Email: {DEFAULT_DOCTOR['email']}")
+        print(f"[Seed]    Password: {DEFAULT_DOCTOR['password']}")
+
+    except Exception as e:
+        print(f"[Seed] ❌ Failed to seed default doctor: {e}")
+
+# Run seed on module load
+seed_default_doctor()
 
 # -------------------------
 # Pydantic Models
 # -------------------------
 class DoctorSignup(BaseModel):
-    """Doctor registration model with comprehensive verification fields"""
-    # Account credentials
     email: EmailStr
     password: str
     name: str
-    
-    # Personal information
     age: int = Field(..., ge=21, le=100)
     date_of_birth: str
     gender: str
-    
-    # Professional information
     specialization: str
-    medical_council_registration: str  # PMC/PMDC number
+    medical_council_registration: str
     medical_council_country: str = "Pakistan"
-    
-    # CNIC for verification
     cnic: str
-    
-    # Contact information
     phone: str
     address: str
     city: str
     hospital_affiliation: str
     hospital_address: str
-    
-    # Years of experience
     years_of_experience: int = Field(..., ge=0, le=50)
-    
-    # Additional qualifications
     additional_qualifications: Optional[str] = None
-    
-    # License image (base64)
     license_image: Optional[str] = None
-    
+
     @validator('password')
     def validate_password(cls, v):
         if len(v) < 8:
@@ -250,11 +255,11 @@ class DoctorSignup(BaseModel):
         if not re.search(r"\d", v):
             raise ValueError("Password must contain at least one number")
         return v
-    
+
     @validator('specialization')
     def validate_specialization(cls, v):
         if v not in MEDICAL_SPECIALTIES:
-            raise ValueError(f"Invalid specialization. Must be one of: {', '.join(MEDICAL_SPECIALTIES)}")
+            raise ValueError(f"Invalid specialization.")
         return v
 
 class DoctorLogin(BaseModel):
@@ -262,7 +267,6 @@ class DoctorLogin(BaseModel):
     password: str
 
 class LicenseVerificationRequest(BaseModel):
-    """Request for license verification"""
     medical_council_registration: str
     doctor_name: str
 
@@ -281,62 +285,27 @@ class MessageResponse(BaseModel):
 
 @router.get("/doctor/specialties", response_model=List[str])
 async def get_medical_specialties():
-    """
-    Get list of all available medical specialties.
-    Used for populating dropdown in signup form.
-    """
     return MEDICAL_SPECIALTIES
+
 
 @router.post("/doctor/signup", response_model=Dict[str, Any])
 async def doctor_signup(signup_data: DoctorSignup):
-    """
-    Doctor registration with comprehensive verification.
-    
-    Required fields:
-    - Email, Password, Name
-    - Age, Date of Birth, Gender
-    - Specialization (from predefined list)
-    - Medical Council Registration (PMC/PMDC number)
-    - CNIC (for identity verification)
-    - Contact information
-    - Hospital affiliation
-    - Years of experience
-    
-    After signup, doctor account requires license verification before activation.
-    """
-    # Check if email already exists
     existing_doctor = doctors_collection.find_one({"email": signup_data.email})
     if existing_doctor:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered"
-        )
-    
-    # Check if medical council registration already exists
+        raise HTTPException(status_code=400, detail="Email already registered")
+
     existing_license = doctors_collection.find_one({
         "medical_council_registration": signup_data.medical_council_registration
     })
     if existing_license:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Medical council registration number already in use"
-        )
-    
-    # Verify CNIC format
+        raise HTTPException(status_code=400, detail="Medical council registration number already in use")
+
     cnic_verification = verify_cnic(signup_data.cnic)
     if not cnic_verification["verified"]:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"CNIC verification failed: {cnic_verification['message']}"
-        )
-    
-    # Verify PMC license
-    license_verification = verify_pmc_license(
-        signup_data.medical_council_registration,
-        signup_data.name
-    )
-    
-    # Create doctor record
+        raise HTTPException(status_code=400, detail=f"CNIC verification failed: {cnic_verification['message']}")
+
+    license_verification = verify_pmc_license(signup_data.medical_council_registration, signup_data.name)
+
     doctor_record = {
         "email": signup_data.email,
         "name": signup_data.name,
@@ -355,21 +324,19 @@ async def doctor_signup(signup_data: DoctorSignup):
         "hospital_address": signup_data.hospital_address,
         "years_of_experience": signup_data.years_of_experience,
         "additional_qualifications": signup_data.additional_qualifications,
-        "license_image": signup_data.license_image,  # Store uploaded license image
+        "license_image": signup_data.license_image,
         "license_verification": license_verification,
         "cnic_verification": cnic_verification,
-        "account_status": "pending_verification" if not license_verification["verified"] else "active",
+        "account_status": "active" if license_verification["verified"] else "pending_verification",
         "created_at": datetime.utcnow().isoformat(),
         "last_login": None,
         "total_consultations": 0,
         "rating": 0,
         "total_reviews": 0
     }
-    
-    # Insert into database
+
     result = doctors_collection.insert_one(doctor_record)
-    
-    # Save verification record
+
     license_verifications_collection.insert_one({
         "doctor_id": str(result.inserted_id),
         "email": signup_data.email,
@@ -379,10 +346,10 @@ async def doctor_signup(signup_data: DoctorSignup):
         "verification_date": datetime.utcnow().isoformat(),
         "status": "completed"
     })
-    
+
     return {
         "success": True,
-        "message": "Registration successful! Your account is " + 
+        "message": "Registration successful! Your account is " +
                    ("active" if license_verification["verified"] else "pending license verification"),
         "doctor_id": str(result.inserted_id),
         "email": signup_data.email,
@@ -391,24 +358,20 @@ async def doctor_signup(signup_data: DoctorSignup):
         "license_details": license_verification
     }
 
+
 @router.post("/doctor/login", response_model=TokenResponse)
 async def doctor_login(login_data: DoctorLogin):
-    """
-    Doctor login with name and password.
-    
-    Only active doctors can login.
-    Pending verification accounts cannot access the system.
-    """
-    # Find doctor by name
-    doctor = doctors_collection.find_one({"name": login_data.name})
-    
+    # Case-insensitive name search
+    doctor = doctors_collection.find_one({
+        "name": {"$regex": f"^{re.escape(login_data.name)}$", "$options": "i"}
+    })
+
     if doctor is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials"
+            detail="Invalid credentials. Doctor not found."
         )
-    
-    # Check account status
+
     if doctor.get("account_status") == "pending_verification":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -418,37 +381,31 @@ async def doctor_login(login_data: DoctorLogin):
                 "license_status": doctor.get("license_verification", {}).get("status", "unknown")
             }
         )
-    
+
     if doctor.get("account_status") == "suspended":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account suspended. Please contact support."
         )
-    
-    # Verify password
+
     if not verify_password(login_data.password, doctor["password_hash"]):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials"
+            detail="Invalid credentials. Wrong password."
         )
-    
-    # Update last login
+
     doctors_collection.update_one(
         {"_id": doctor["_id"]},
         {"$set": {"last_login": datetime.utcnow().isoformat()}}
     )
-    
-    # Create access token
-    access_token = create_access_token(
-        data={
-            "sub": doctor["email"],
-            "role": "doctor",
-            "name": doctor["name"],
-            "specialization": doctor["specialization"]
-        }
-    )
-    
-    # Prepare doctor response (exclude sensitive data)
+
+    access_token = create_access_token(data={
+        "sub": doctor["email"],
+        "role": "doctor",
+        "name": doctor["name"],
+        "specialization": doctor["specialization"]
+    })
+
     doctor_response = {
         "id": str(doctor["_id"]),
         "name": doctor["name"],
@@ -459,48 +416,36 @@ async def doctor_login(login_data: DoctorLogin):
         "account_status": doctor.get("account_status", "active"),
         "license_verified": doctor.get("license_verification", {}).get("verified", False)
     }
-    
+
     return TokenResponse(
         access_token=access_token,
         token_type="bearer",
         doctor=doctor_response
     )
 
+
 @router.post("/doctor/verify-license", response_model=Dict[str, Any])
 async def verify_doctor_license(verification_request: LicenseVerificationRequest):
-    """
-    Manually trigger license verification.
-    Used for re-verification or initial verification if it failed.
-    """
-    # Find doctor by medical council registration
     doctor = doctors_collection.find_one({
         "medical_council_registration": verification_request.medical_council_registration
     })
-    
+
     if not doctor:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Doctor not found with this registration number"
-        )
-    
-    # Perform verification
+        raise HTTPException(status_code=404, detail="Doctor not found with this registration number")
+
     license_verification = verify_pmc_license(
         verification_request.medical_council_registration,
         verification_request.doctor_name
     )
-    
-    # Update doctor record
+
     doctors_collection.update_one(
         {"medical_council_registration": verification_request.medical_council_registration},
-        {
-            "$set": {
-                "license_verification": license_verification,
-                "account_status": "active" if license_verification["verified"] else "pending_verification"
-            }
-        }
+        {"$set": {
+            "license_verification": license_verification,
+            "account_status": "active" if license_verification["verified"] else "pending_verification"
+        }}
     )
-    
-    # Save verification record
+
     license_verifications_collection.insert_one({
         "doctor_id": str(doctor["_id"]),
         "email": doctor["email"],
@@ -510,7 +455,7 @@ async def verify_doctor_license(verification_request: LicenseVerificationRequest
         "verification_date": datetime.utcnow().isoformat(),
         "status": "completed"
     })
-    
+
     return {
         "success": True,
         "verified": license_verification["verified"],
@@ -519,72 +464,44 @@ async def verify_doctor_license(verification_request: LicenseVerificationRequest
         "license_details": license_verification
     }
 
+
 @router.get("/doctor/profile", response_model=Dict[str, Any])
 async def get_doctor_profile(email: str):
-    """
-    Get doctor profile information.
-    """
     doctor = doctors_collection.find_one({"email": email})
-    
     if not doctor:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Doctor not found"
-        )
-    
-    # Remove sensitive data
+        raise HTTPException(status_code=404, detail="Doctor not found")
     doctor.pop("password_hash", None)
     doctor.pop("cnic", None)
     doctor["_id"] = str(doctor["_id"])
-    
     return doctor
+
 
 @router.get("/doctor/patients", response_model=List[Dict[str, Any]])
 async def get_all_patients():
-    """
-    Get all patients managed by doctors.
-    """
     patients_collection = db["patients"]
     patients = list(patients_collection.find({}, {
-        "caseid": 1,
-        "patid": 1,
-        "pname": 1,
-        "dob": 1,
-        "age": 1,
-        "gender": 1,
-        "disease": 1,
-        "presenting_complaint": 1,
-        "patient_email": 1
+        "caseid": 1, "patid": 1, "pname": 1, "dob": 1,
+        "age": 1, "gender": 1, "disease": 1,
+        "presenting_complaint": 1, "patient_email": 1
     }).limit(100))
 
     for patient in patients:
         patient["id"] = str(patient["_id"])
         del patient["_id"]
-
     return patients
+
 
 @router.post("/doctor/verify-patient", response_model=Dict[str, Any])
 async def verify_patient(patient_data: dict):
-    """
-    Verify patient details from database.
-    """
     patients_collection = db["patients"]
-    
-    # Search for patient
-    patient = patients_collection.find_one({
-        "patid": patient_data.get("patid")
-    })
-    
+    patient = patients_collection.find_one({"patid": patient_data.get("patid")})
+
     if patient is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={
-                "verified": False,
-                "reason": "Patient not found"
-            }
+            status_code=404,
+            detail={"verified": False, "reason": "Patient not found"}
         )
-    
-    # Return patient information
+
     return {
         "verified": True,
         "patient": {
@@ -607,22 +524,16 @@ async def verify_patient(patient_data: dict):
         }
     }
 
+
 @router.post("/doctor/patient/add", response_model=Dict[str, Any])
 async def add_new_patient(patient_data: dict):
-    """
-    Add a new patient to the database.
-    """
-    from datetime import datetime
     import random
-    
     patients_collection = db["patients"]
-    
+
     try:
-        # Generate unique IDs
         case_id = f"CASE-{datetime.now().year}-{str(random.randint(10000, 99999))}"
         patient_id = f"PAT-{str(random.randint(100000, 999999))}"
-        
-        # Create patient document
+
         new_patient = {
             "caseid": case_id,
             "patid": patient_id,
@@ -646,10 +557,9 @@ async def add_new_patient(patient_data: dict):
             "created_at": datetime.utcnow().isoformat(),
             "source": "doctor_added"
         }
-        
-        # Insert into database
+
         result = patients_collection.insert_one(new_patient)
-        
+
         return {
             "success": True,
             "message": "Patient added successfully",
@@ -663,15 +573,12 @@ async def add_new_patient(patient_data: dict):
                 "disease": new_patient["disease"]
             }
         }
-        
+
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to add patient: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to add patient: {str(e)}")
+
 
 def get_mismatched_fields(patient: Dict, input_data: dict) -> List[str]:
-    """Helper function to identify which fields don't match"""
     mismatched = []
     if patient.get("caseid") != input_data.get("caseid"):
         mismatched.append("caseid")

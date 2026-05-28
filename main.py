@@ -32,12 +32,12 @@ app = FastAPI(title="IntelliHealth AI Clinical System")
 # -------------------------
 origins = ["*"]
 app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+       CORSMiddleware,
+       allow_origins=["http://localhost:3000"],  # explicit origin, not "*"
+       allow_credentials=True,
+       allow_methods=["*"],
+       allow_headers=["*"],
+   )
 
 # -------------------------
 # Groq API Client Setup
@@ -50,10 +50,22 @@ else:
     groq_client = Groq(api_key=groq_api_key)
 
 # -------------------------
-# MongoDB Setup
+# MongoDB Setup with DB Connection Logging
 # -------------------------
 mongodburl = os.getenv('MONGODB_URL', os.getenv('LOCAL_MONGODB_URL', 'mongodb://localhost:27017/'))
-db_name = os.getenv('MONGODB_DBFULL_DB', 'dbfull')
+db_name = os.getenv('MONGODB_LOCAL_DB', 'local_data')
+
+is_live = "mongodb+srv" in mongodburl
+
+print("\n" + "="*60)
+if is_live:
+    print("🌐  DATABASE MODE : LIVE ATLAS (Cloud)")
+else:
+    print("💻  DATABASE MODE : LOCAL MongoDB")
+print(f"📁  Database Name : {db_name}")
+print(f"🔗  URL Type      : {'mongodb+srv (Atlas)' if is_live else 'localhost (Local)'}")
+print("="*60 + "\n")
+
 client = MongoClient(mongodburl)
 db = client[db_name]
 patients_collection = db["patients"]
@@ -102,72 +114,37 @@ class ClinicalQuery(BaseModel):
 # -------------------------
 def should_send_email(patient_email: str) -> tuple[bool, str]:
     """
-    Determine if we should send an email to this patient.
-    
-    Rules:
-    - Send email after every 5 messages
-    - Maximum 3 emails per patient total
-    
-    Returns:
-        tuple: (should_send: bool, reason: str)
+    Send email ONCE on the FIRST query for each unique patient email.
+    Never sends again after that.
     """
     if not patient_email:
         return False, "No patient email provided"
-    
-    # Get or create tracking document for this patient
+
     tracking = email_notifications_collection.find_one({"patient_email": patient_email})
-    
+
+    # If already sent once before — skip forever
+    if tracking and tracking.get("emails_sent", 0) >= 1:
+        return False, f"Email already sent to {patient_email} on first query — skipping"
+
     if not tracking:
-        # First time - create tracking document
+        # Brand new patient — create tracking record
         email_notifications_collection.insert_one({
             "patient_email": patient_email,
-            "total_queries": 0,
             "emails_sent": 0,
-            "last_email_at_query": 0,
             "created_at": datetime.utcnow().isoformat()
         })
-        tracking = email_notifications_collection.find_one({"patient_email": patient_email})
-    
-    total_queries = tracking.get("total_queries", 0)
-    emails_sent = tracking.get("emails_sent", 0)
-    
-    # Increment query count
-    total_queries += 1
-    
-    # Check if we should send email
-    should_send = False
-    reason = ""
-    
-    if emails_sent >= 3:
-        reason = f"Maximum emails (3) already sent to {patient_email}"
-        should_send = False
-    elif total_queries % 5 == 0:
-        # Every 5th message - send email
-        should_send = True
-        reason = f"Query #{total_queries} - Sending email #{emails_sent + 1}/3"
-    else:
-        reason = f"Query #{total_queries} - Next email at query {((total_queries // 5) + 1) * 5}"
-        should_send = False
-    
-    # Update tracking document
+
+    # Mark as sent
     email_notifications_collection.update_one(
         {"patient_email": patient_email},
-        {
-            "$set": {
-                "total_queries": total_queries,
-                "last_email_at_query": total_queries if should_send else tracking.get("last_email_at_query", 0)
-            },
-            "$inc": {"emails_sent": 1} if should_send else {}
-        }
+        {"$set": {
+            "emails_sent": 1,
+            "first_sent_at": datetime.utcnow().isoformat()
+        }}
     )
-    
-    print(f"\n📊 Email Tracking for {patient_email}:")
-    print(f"   - Total queries: {total_queries}")
-    print(f"   - Emails sent: {emails_sent + (1 if should_send else 0)}/3")
-    print(f"   - Should send: {should_send}")
-    print(f"   - Reason: {reason}")
-    
-    return should_send, reason
+
+    print(f"✅ First query for {patient_email} — sending email now")
+    return True, f"First consultation detected for {patient_email} — sending email"
 
 
 # -------------------------
@@ -648,7 +625,7 @@ RESPONSE FORMAT GUIDELINES:
 - Only use headings when they add clarity
 - Explain complex concepts clearly
 - Highlight critical information prominently
-- Explicitly describe how the patient’s age affects diagnosis, treatment, and monitoring
+- Explicitly describe how the patient's age affects diagnosis, treatment, and monitoring
 - For pediatric patients, note any age-specific dosing or developmental considerations
 - For older adults, note geriatric safety, cognitive status, renal function, and fall risk
 - Reference applicable ADA 2026 section titles or age-specific guidance when using guideline-based reasoning
@@ -723,8 +700,9 @@ async def clinical_query(query_data: ClinicalQuery, background_tasks: Background
 
         result = generate_advanced_ai_response(query_data)
 
-        # Save analysis
+        # Save analysis (truncated to save storage)
         try:
+            response_text = result.get("content", "")
             analyses_collection.insert_one({
                 "caseid": query_data.caseid,
                 "patid": query_data.patid,
@@ -732,7 +710,7 @@ async def clinical_query(query_data: ClinicalQuery, background_tasks: Background
                 "query_type": query_data.query_type,
                 "conversation_type": query_data.conversation_type,
                 "query": query_data.custom_query or query_data.query_type,
-                "response": result.get("content", ""),
+                "response": response_text[:300] + "..." if len(response_text) > 300 else response_text,
                 "has_image": bool(query_data.image_data),
                 "has_pdf": bool(query_data.pdf_text),
                 "had_uploaded_data": bool(query_data.pdf_text or query_data.image_data),
@@ -854,16 +832,17 @@ async def upload_guideline(file: UploadFile = File(...)):
     """
     Upload and extract text from ADA/clinical guideline PDF.
     Supports multiple PDFs - each will be integrated into LLM context.
+    Stored in memory only - NOT saved to MongoDB to preserve storage.
     """
     try:
         file_bytes = await file.read()
         extracted_text = extract_text_from_pdf(file_bytes)
         page_count = len(fitz.open(stream=file_bytes, filetype="pdf"))
         word_count = len(extracted_text.split())
-        
+
         # Generate source name from filename
         source_name = file.filename.replace(".pdf", "").replace(" ", "_").upper()[:50]
-        
+
         print("\n" + "="*70)
         print(f"📥 GUIDELINE PDF UPLOAD: {file.filename}")
         print("="*70)
@@ -871,34 +850,18 @@ async def upload_guideline(file: UploadFile = File(...)):
         print(f"📊 Pages: {page_count}")
         print(f"📝 Words: {word_count:,}")
         print(f"💾 Characters: {len(extracted_text):,}")
-        
-        # Store in ADA engine
+
+        # Store in ADA engine (memory only — NOT saved to MongoDB)
         ada_engine = get_ada_engine()
-        add_result = ada_engine.add_guideline_source(
+        ada_engine.add_guideline_source(
             source_name=source_name,
             content=extracted_text,
             source_type="guideline"
         )
-        
-        print(f"\n✅ Added to ADA engine: {source_name}")
-        
-        # Also store in MongoDB for persistence
-        guidelines_collection = db["guidelines"]
-        db_record = {
-            "filename": file.filename,
-            "source_name": source_name,
-            "content": extracted_text,
-            "uploaded_at": datetime.utcnow().isoformat(),
-            "page_count": page_count,
-            "word_count": word_count,
-            "char_count": len(extracted_text),
-            "active": True,
-            "type": "guideline"
-        }
-        guidelines_collection.insert_one(db_record)
-        
-        print(f"✅ Stored in MongoDB: {source_name}")
-        
+
+        print(f"✅ Added to ADA engine memory: {source_name}")
+        print(f"⚠️  Stored in memory only — not saved to MongoDB (storage optimisation)")
+
         # Get updated stats
         stats = ada_engine.get_guideline_stats()
         print(f"\n📋 CURRENT GUIDELINE LIBRARY:")
@@ -906,9 +869,9 @@ async def upload_guideline(file: UploadFile = File(...)):
         print(f"   - Total words in context: {stats['total_content_words']:,}")
         for src_name in stats['sources'].keys():
             print(f"      ✓ {src_name}")
-        
+
         print("="*70 + "\n")
-        
+
         return {
             "success": True,
             "message": f"Guideline '{source_name}' uploaded and activated",
@@ -920,7 +883,7 @@ async def upload_guideline(file: UploadFile = File(...)):
             "total_sources_now_loaded": stats['total_sources_loaded'],
             "all_sources": list(stats['sources'].keys()),
             "status": "PDF integrated into multi-guideline context for ADA mode",
-            "note": "This PDF will be used in ALL subsequent ADA mode queries"
+            "note": "Stored in memory only. Re-upload if server restarts."
         }
     except Exception as e:
         print(f"❌ Upload error: {str(e)}")
@@ -1021,19 +984,12 @@ async def get_demo_cases(patient_data: DemoPatientData):
 async def run_demo_case(demo_request: dict):
     """
     Run a demo analysis for the current patient.
-    
-    Args:
-        demo_request: Contains patient_data and query_type
-    
-    Returns:
-        Complete AI analysis for the selected demo type
     """
     import time
     
     patient_data = demo_request.get("patient_data", {})
     query_type = demo_request.get("query_type", "Explain")
     
-    # Build full query object
     full_query = {
         "caseid": patient_data.get("caseid", "DEMO"),
         "patid": patient_data.get("patid", "DEMO"),
@@ -1054,10 +1010,8 @@ async def run_demo_case(demo_request: dict):
         "custom_query": ""
     }
     
-    # Create ClinicalQuery object
     query = ClinicalQuery(**full_query)
     
-    # Generate AI response
     start_time = time.time()
     result = generate_advanced_ai_response(query)
     response_time = round(time.time() - start_time, 2)
