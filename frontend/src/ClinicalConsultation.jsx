@@ -65,8 +65,7 @@ const ClinicalConsultation = ({ patientData, onBack, onLogout }) => {
       };
 
       const token = localStorage.getItem('authToken');
-      // ✅ FIXED: endpoint changed from /clinical-query to /clinical-analysis
-      const response = await axios.post(`${API_URL}/clinical-analysis`, payload, {
+      const response = await axios.post(`${API_URL}/api/clinical-analysis`, payload, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -75,7 +74,6 @@ const ClinicalConsultation = ({ patientData, onBack, onLogout }) => {
       setAnalysisResult(response.data);
       setShowAnalysis(true);
 
-      // ✅ FIXED: new backend returns response.data.content (not ai_response.response)
       if (response.data.content) {
         setMessages(prev => [...prev, {
           role: 'assistant',
@@ -122,14 +120,12 @@ const ClinicalConsultation = ({ patientData, onBack, onLogout }) => {
       };
 
       const quickToken = localStorage.getItem('authToken');
-      // ✅ FIXED: endpoint changed from /clinical-query to /clinical-analysis
-      const response = await axios.post(`${API_URL}/clinical-analysis`, payload, {
+      const response = await axios.post(`${API_URL}/api/clinical-analysis`, payload, {
         headers: {
           Authorization: `Bearer ${quickToken}`
         }
       });
 
-      // ✅ FIXED: new backend returns response.data.content (not ai_response.response)
       if (response.data.content) {
         setMessages(prev => [...prev,
           { role: 'user', content: quickQuery },
@@ -436,7 +432,6 @@ const ClinicalConsultation = ({ patientData, onBack, onLogout }) => {
           {/* Right Column - AI Analysis & Chat */}
           <div className="lg:col-span-2 space-y-4">
 
-            {/* ✅ AI Response Card — shows content from new backend */}
             <AnimatePresence>
               {showAnalysis && analysisResult && analysisResult.content && (
                 <motion.div
