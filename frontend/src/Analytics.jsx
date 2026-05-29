@@ -421,7 +421,7 @@ const Analytics = ({ patientName, patientEmail }) => {
  title="Total Analyses"
  value={summary?.totalAnalyses || 0}
  icon={<FiDatabase className="w-6 h-6 text-white" />}
- color="bg-purple-400
+ color="bg-purple-400"
  />
  <StatCard
  title="Unique Medications"
@@ -434,13 +434,13 @@ const Analytics = ({ patientName, patientEmail }) => {
  title="Unique Diseases"
  value={summary?.uniqueDiseases || 0}
  icon={<FiTrendingUp className="w-6 h-6 text-white" />}
- color="bg-purple-400
+ color="bg-purple-400"
  />
  <StatCard
  title="Safety Rate"
  value={`${summary?.safetyRate || 0}%`}
  icon={<FiAlertCircle className="w-6 h-6 text-white" />}
- color="bg-amber-500
+ color="bg-amber-500"
  />
  </div>
 
