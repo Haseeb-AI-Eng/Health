@@ -1016,7 +1016,12 @@ const IntelliHealthInterface = ({ patientData, onBack, onLogout }) => {
  console.log('📧 Full editableData:', editableData);
  console.log('📧 Payload being sent:', JSON.stringify(payload, null, 2));
 
- const response = await axios.post(`${API_URL}/clinical-query`, payload);
+    const token = localStorage.getItem('authToken');
+    const response = await axios.post(`${API_URL}/api/clinical-analysis`, payload, {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
 
  console.log('✅ Response received:', response);
  console.log('✅ Response status:', response.status);
