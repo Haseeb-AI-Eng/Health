@@ -9,7 +9,6 @@ import {
  FiFileText,
  FiMapPin,
  FiPhone,
- FiHospital,
  FiAward,
  FiCheckCircle,
  FiAlertCircle,

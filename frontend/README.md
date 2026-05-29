@@ -29,7 +29,7 @@ This is a React-based frontend for the Medical Prescription Checker API. It prov
     # From C:\Users\Computer\Desktop\opencl\
     uvicorn main:app --reload
     ```
-    The backend should be running on `http://127.0.0.1:8000`.
+    The backend is currently hosted at `http://8000-izlfj7gl7597sycoftln2-b2401b06.us2.manus.computer/`.
 
 4.  **Start the frontend development server:**
     ```bash

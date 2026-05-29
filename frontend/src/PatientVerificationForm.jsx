@@ -82,7 +82,12 @@ const PatientVerificationForm = ({ onVerificationSuccess, onCancel }) => {
 
  const loadPatients = async () => {
  try {
- const response = await axios.get(`${API_URL}/api/doctor/patients`);
+ const token = localStorage.getItem('authToken');
+ const response = await axios.get(`${API_URL}/api/doctor/patients`, {
+ headers: {
+ Authorization: `Bearer ${token}`
+ }
+ });
  setPatients(response.data);
  setShowPatientList(true);
  } catch (err) {
@@ -129,7 +134,12 @@ const PatientVerificationForm = ({ onVerificationSuccess, onCancel }) => {
  case_notes: addPatientData.case_notes || null
  };
 
- const response = await axios.post(`${API_URL}/api/doctor/patient/add`, payload);
+ const token = localStorage.getItem('authToken');
+ const response = await axios.post(`${API_URL}/api/doctor/patient/add`, payload, {
+ headers: {
+ Authorization: `Bearer ${token}`
+ }
+ });
 
  if (response.data.success) {
  setSuccess(`✅ Patient added successfully! Case ID: ${response.data.patient.caseid}, Patient ID: ${response.data.patient.patid}`);
@@ -174,12 +184,17 @@ const PatientVerificationForm = ({ onVerificationSuccess, onCancel }) => {
  setIsLoading(true);
 
  try {
+ const token = localStorage.getItem('authToken');
  const response = await axios.post(`${API_URL}/api/doctor/verify-patient`, {
  caseid: formData.caseid,
  patid: formData.patid,
  pname: formData.pname,
  dob: formData.dob,
  age: parseInt(formData.age)
+ }, {
+ headers: {
+ Authorization: `Bearer ${token}`
+ }
  });
 
  if (response.data.verified) {

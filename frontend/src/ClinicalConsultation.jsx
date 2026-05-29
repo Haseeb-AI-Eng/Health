@@ -67,7 +67,12 @@ const ClinicalConsultation = ({ patientData, onBack, onLogout }) => {
  doctor_name: editableData.doctor_name || localStorage.getItem('doctorName') || 'Your Healthcare Provider'
  };
 
- const response = await axios.post(`${API_URL}/clinical-query`, payload);
+ const token = localStorage.getItem('authToken');
+ const response = await axios.post(`${API_URL}/clinical-query`, payload, {
+ headers: {
+ Authorization: `Bearer ${token}`
+ }
+ });
 
  setAnalysisResult(response.data);
  setShowAnalysis(true);
@@ -81,6 +86,7 @@ const ClinicalConsultation = ({ patientData, onBack, onLogout }) => {
 
  // Save analysis
  try {
+ const saveToken = localStorage.getItem('authToken');
  await axios.post(`${API_URL}/save-analysis`, {
  caseid: editableData.caseid,
  patid: editableData.patid,
@@ -93,6 +99,10 @@ const ClinicalConsultation = ({ patientData, onBack, onLogout }) => {
  explanation: response.data.explanation,
  drug_interactions: response.data.drug_interactions,
  ai_response: response.data.ai_response
+ }, {
+ headers: {
+ Authorization: `Bearer ${saveToken}`
+ }
  });
  } catch (saveError) {
  console.error('Failed to save analysis:', saveError);
@@ -136,7 +146,12 @@ const ClinicalConsultation = ({ patientData, onBack, onLogout }) => {
  doctor_name: editableData.doctor_name || localStorage.getItem('doctorName') || 'Your Healthcare Provider'
  };
 
- const response = await axios.post(`${API_URL}/clinical-query`, payload);
+ const quickToken = localStorage.getItem('authToken');
+ const response = await axios.post(`${API_URL}/clinical-query`, payload, {
+ headers: {
+ Authorization: `Bearer ${quickToken}`
+ }
+ });
 
  if (response.data.ai_response) {
  setMessages(prev => [...prev,

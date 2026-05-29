@@ -23,10 +23,23 @@ router = APIRouter(prefix="/api", tags=["Doctor System"])
 # -------------------------
 mongodburl = os.getenv('MONGODB_URL', os.getenv('LOCAL_MONGODB_URL', 'mongodb://localhost:27017/')) # This correctly picks up MONGODB_URL from .env
 db_name = os.getenv('MONGODB_DBFULL_DB', 'dbfull') # Use 'dbfull' as per migration guide for doctor data
-client = MongoClient(mongodburl)
-db = client[db_name]
-doctors_collection = db["doctors"]
-license_verifications_collection = db["license_verifications"]
+
+try:
+    client = MongoClient(mongodburl, serverSelectionTimeoutMS=5000)
+    # Test the connection
+    client.admin.command('ping')
+    db = client[db_name]
+    doctors_collection = db["doctors"]
+    license_verifications_collection = db["license_verifications"]
+    patients_collection = db["patients"]  # For patient-related operations
+    print(f"✅ [Doctor Auth] MongoDB connected to database: {db_name}")
+except Exception as e:
+    print(f"❌ [Doctor Auth] MongoDB connection failed: {e}")
+    # Set to None so we can check for this in endpoints
+    db = None
+    doctors_collection = None
+    license_verifications_collection = None
+    patients_collection = None
 
 # -------------------------
 # Medical Specialties
@@ -361,6 +374,13 @@ async def doctor_signup(signup_data: DoctorSignup):
 
 @router.post("/doctor/login", response_model=TokenResponse)
 async def doctor_login(login_data: DoctorLogin):
+    # Check if database is available
+    if doctors_collection is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database unavailable - MongoDB connection failed. Check MONGODB_URL environment variable on Replit."
+        )
+    
     # Case-insensitive name search
     doctor = doctors_collection.find_one({
         "name": {"$regex": f"^{re.escape(login_data.name)}$", "$options": "i"}

@@ -1014,8 +1014,13 @@ const IntelliHealthInterface = ({ patientData, onBack, onLogout }) => {
  console.log('📧 Sending clinical query with patient_email:', payload.patient_email);
  console.log('📧 Doctor name:', payload.doctor_name);
  console.log('📧 Full editableData:', editableData);
+ console.log('📧 Payload being sent:', JSON.stringify(payload, null, 2));
 
  const response = await axios.post(`${API_URL}/clinical-query`, payload);
+
+ console.log('✅ Response received:', response);
+ console.log('✅ Response status:', response.status);
+ console.log('✅ Response data:', response.data);
 
  // Hide initial loader after 1.5 seconds
  setTimeout(() => {
@@ -1024,6 +1029,7 @@ const IntelliHealthInterface = ({ patientData, onBack, onLogout }) => {
 
  if (response.data.success) {
  const fullResponse = response.data.content;
+ console.log('✅ Success! Response content:', fullResponse);
  setAiResponse(fullResponse);
  setStreamingResponseId(newChatId);
 
@@ -1045,7 +1051,11 @@ const IntelliHealthInterface = ({ patientData, onBack, onLogout }) => {
  // Clear query after sending
  setQuery('');
  } else {
+ console.log('❌ Response success is false');
+ console.log('❌ Full response object:', response.data);
+ console.log('❌ Error field:', response.data.error);
  const errorMsg = 'Error: ' + (response.data.error || 'Unknown error');
+ console.error('❌ Setting error message:', errorMsg);
  setAiResponse(errorMsg);
  // Update chat history with error
  setChatHistory(prev => prev.map(chat =>
@@ -1063,8 +1073,13 @@ const IntelliHealthInterface = ({ patientData, onBack, onLogout }) => {
  }
 
  } catch (error) {
- console.error('Error:', error);
+ console.error('❌ Error caught in try-catch:', error);
+ console.error('❌ Error response:', error.response);
+ console.error('❌ Error response data:', error.response?.data);
+ console.error('❌ Error message:', error.message);
+ console.error('❌ Full error object:', JSON.stringify(error, null, 2));
  const errorMsg = 'Error: ' + (error.response?.data?.detail || error.message || 'Failed to get AI response');
+ console.error('❌ Final error message:', errorMsg);
  setAiResponse(errorMsg);
  // Update chat history with error
  setChatHistory(prev => prev.map(chat =>
@@ -1089,6 +1104,8 @@ const IntelliHealthInterface = ({ patientData, onBack, onLogout }) => {
  const file = e.target.files[0];
  if (!file) return;
 
+ console.log('🖼️ Uploading image:', file.name);
+
  const formData = new FormData();
  formData.append('file', file);
 
@@ -1097,12 +1114,19 @@ const IntelliHealthInterface = ({ patientData, onBack, onLogout }) => {
  headers: { 'Content-Type': 'multipart/form-data' }
  });
  
+ console.log('🖼️ Image upload response:', response.data);
+ 
  if (response.data.success) {
  setUploadedImage(response.data.image_data);
  setUploadedImageName(file.name);
  alert('Image uploaded! Click ASK AI to analyze.');
+ } else {
+ console.error('🖼️ Image upload failed - success false:', response.data);
+ alert('Failed to upload image: ' + (response.data.error || 'Unknown error'));
  }
  } catch (error) {
+ console.error('🖼️ Image upload error:', error);
+ console.error('🖼️ Error response:', error.response?.data);
  alert('Failed to upload image: ' + (error.response?.data?.detail || error.message));
  }
  };
@@ -1110,6 +1134,8 @@ const IntelliHealthInterface = ({ patientData, onBack, onLogout }) => {
  const handlePdfUpload = async (e) => {
  const file = e.target.files[0];
  if (!file) return;
+
+ console.log('📄 Uploading PDF:', file.name);
 
  const formData = new FormData();
  formData.append('file', file);
@@ -1119,14 +1145,21 @@ const IntelliHealthInterface = ({ patientData, onBack, onLogout }) => {
  headers: { 'Content-Type': 'multipart/form-data' }
  });
  
+ console.log('📄 PDF upload response:', response.data);
+ 
  if (response.data.success) {
  setUploadedPdfText(response.data.pdf_text);
  setUploadedPdfName(file.name);
  setPdfContent(response.data.pdf_text);
  setShowPdfModal(true);
  alert(`PDF uploaded (${response.data.pages_count} pages)! Click ASK AI to analyze.`);
+ } else {
+ console.error('📄 PDF upload failed - success false:', response.data);
+ alert('Failed to upload PDF: ' + (response.data.error || 'Unknown error'));
  }
  } catch (error) {
+ console.error('📄 PDF upload error:', error);
+ console.error('📄 Error response:', error.response?.data);
  alert('Failed to upload PDF: ' + (error.response?.data?.detail || error.message));
  }
  };

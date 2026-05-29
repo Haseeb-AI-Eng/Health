@@ -30,10 +30,15 @@ app = FastAPI(title="IntelliHealth AI Clinical System")
 # -------------------------
 # CORS Middleware Setup
 # -------------------------
-origins = ["*"]
+origins = [
+    "http://localhost:3000",  # Local development
+    "http://127.0.0.1:3000",  # Local development
+    "https://hello-who--irumzainab3.replit.app",  # Frontend Replit
+    "*"  # Allow all origins for now (can be restricted later with specific domain)
+]
 app.add_middleware(
        CORSMiddleware,
-       allow_origins=["http://localhost:3000"],  # explicit origin, not "*"
+       allow_origins=origins,
        allow_credentials=True,
        allow_methods=["*"],
        allow_headers=["*"],
@@ -64,13 +69,27 @@ else:
     print("💻  DATABASE MODE : LOCAL MongoDB")
 print(f"📁  Database Name : {db_name}")
 print(f"🔗  URL Type      : {'mongodb+srv (Atlas)' if is_live else 'localhost (Local)'}")
+print(f"🔑  MongoDB URL   : {mongodburl[:50]}..." if mongodburl else "❌ MONGODB_URL NOT SET")
 print("="*60 + "\n")
 
-client = MongoClient(mongodburl)
-db = client[db_name]
-patients_collection = db["patients"]
-analyses_collection = db["analyses"]
-email_notifications_collection = db["email_notifications"]  # Track email sending per patient
+# Initialize MongoDB with error handling
+try:
+    client = MongoClient(mongodburl, serverSelectionTimeoutMS=5000)
+    # Test the connection
+    client.admin.command('ping')
+    db = client[db_name]
+    patients_collection = db["patients"]
+    analyses_collection = db["analyses"]
+    email_notifications_collection = db["email_notifications"]
+    print("✅ MongoDB connection successful!")
+except Exception as e:
+    print(f"❌ MongoDB connection failed: {e}")
+    print("⚠️  Some features will not work until MongoDB is configured")
+    # Create placeholder collections that will fail on use
+    db = None
+    patients_collection = None
+    analyses_collection = None
+    email_notifications_collection = None
 
 # -------------------------
 # Include Routers
@@ -1052,6 +1071,36 @@ async def root():
             "list_demos": "POST /demo-cases - Get demo options for current patient",
             "run_demo": "POST /demo-case/run - Run demo and generate PDF report"
         }
+    }
+
+
+@app.get("/health")
+async def health():
+    """Health check endpoint that verifies database connectivity"""
+    db_status = "unknown"
+    db_message = "Database status unknown"
+    
+    try:
+        if client is not None:
+            client.admin.command('ping')
+            db_status = "connected"
+            db_message = f"✅ Connected to {db_name} database"
+        else:
+            db_status = "disconnected"
+            db_message = "❌ Database client not initialized - Check MONGODB_URL environment variable"
+    except Exception as e:
+        db_status = "error"
+        db_message = f"❌ Database connection error: {str(e)}"
+    
+    return {
+        "status": "healthy" if db_status == "connected" else "unhealthy",
+        "database": {
+            "status": db_status,
+            "message": db_message,
+            "name": db_name
+        },
+        "groq_api": "configured" if groq_client else "not configured",
+        "timestamp": datetime.utcnow().isoformat()
     }
 
 if __name__ == "__main__":
