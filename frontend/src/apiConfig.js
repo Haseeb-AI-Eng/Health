@@ -1,1 +1,1 @@
-export const API_URL = 'https://hi-bot--dawsonreeve22.replit.app/api';
+export const API_URL = 'https://hi-bot--dawsonreeve22.replit.app';
