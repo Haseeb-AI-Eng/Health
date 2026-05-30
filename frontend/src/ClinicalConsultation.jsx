@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   FiActivity,
@@ -12,7 +12,13 @@ import {
   FiArrowLeft,
   FiDroplet,
   FiHeart,
-  FiInfo
+  FiInfo,
+  FiDownload,
+  FiAlertCircle,
+  FiShield,
+  FiBook,
+  FiMail,
+  FiX
 } from 'react-icons/fi';
 import axios from 'axios';
 import { API_URL } from './apiConfig';
@@ -27,6 +33,151 @@ const ClinicalConsultation = ({ patientData, onBack, onLogout }) => {
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [messages, setMessages] = useState([]);
   const [conversationType, setConversationType] = useState('generic');
+  
+  // New: Session management
+  const [sessionId, setSessionId] = useState(null);
+  const [sessions, setSessions] = useState([]);
+  const [showSessions, setShowSessions] = useState(false);
+  
+  // New: Structured response & guidelines
+  const [structuredResponse, setStructuredResponse] = useState(null);
+  const [guidelines, setGuidelines] = useState(null);
+  const [guidelinesLoading, setGuidelinesLoading] = useState(false);
+  
+  // New: Email notification
+  const [notifyPatient, setNotifyPatient] = useState(false);
+  const [reportDownloading, setReportDownloading] = useState(false);
+
+  const token = localStorage.getItem('authToken');
+
+  // ============ NEW: Session Management Functions ============
+  
+  // Create a new session
+  const createSession = async () => {
+    try {
+      const response = await axios.post(
+        `${API_URL}/api/consultations/sessions`,
+        {
+          patient_id: editableData.patid || null,
+          patient_name: editableData.pname || null,
+          patient_email: editableData.patient_email || null,
+          title: `Consultation: ${editableData.pname} - ${new Date().toLocaleDateString()}`
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setSessionId(response.data.id);
+      setMessages([]);
+      setStructuredResponse(null);
+      setAnalysisResult(null);
+      return response.data.id;
+    } catch (error) {
+      console.error('Failed to create session:', error);
+      alert('Failed to create consultation session');
+      return null;
+    }
+  };
+
+  // Fetch all sessions
+  const fetchSessions = async () => {
+    try {
+      const response = await axios.get(
+        `${API_URL}/api/consultations/sessions`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setSessions(response.data);
+    } catch (error) {
+      console.error('Failed to fetch sessions:', error);
+    }
+  };
+
+  // Fetch messages for a session
+  const loadSession = async (id) => {
+    try {
+      const response = await axios.get(
+        `${API_URL}/api/consultations/sessions/${id}/messages`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setSessionId(id);
+      setMessages(response.data);
+      setShowSessions(false);
+    } catch (error) {
+      console.error('Failed to load session:', error);
+    }
+  };
+
+  // Delete a session
+  const deleteSession = async (id) => {
+    if (!window.confirm('Delete this session? This cannot be undone.')) return;
+    try {
+      await axios.delete(
+        `${API_URL}/api/consultations/sessions/${id}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (sessionId === id) {
+        setSessionId(null);
+        setMessages([]);
+        setStructuredResponse(null);
+      }
+      fetchSessions();
+    } catch (error) {
+      console.error('Failed to delete session:', error);
+    }
+  };
+
+  // Fetch guidelines metadata
+  const fetchGuidelines = async () => {
+    setGuidelinesLoading(true);
+    try {
+      const response = await axios.get(`${API_URL}/api/consultations/guidelines`);
+      setGuidelines(response.data);
+    } catch (error) {
+      console.error('Failed to fetch guidelines:', error);
+    } finally {
+      setGuidelinesLoading(false);
+    }
+  };
+
+  // Download PDF report
+  const downloadReport = async () => {
+    if (!sessionId) return;
+    setReportDownloading(true);
+    try {
+      const response = await axios.get(
+        `${API_URL}/api/consultations/sessions/${sessionId}/report`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          responseType: 'blob'
+        }
+      );
+      const url = URL.createObjectURL(response.data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `IntelliHealth_Report_${editableData.pname}_${new Date().toISOString().split('T')[0]}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      if (error.response?.status === 422) {
+        alert('No clinical analysis in this session yet. Generate an analysis first.');
+      } else {
+        console.error('Failed to download report:', error);
+        alert('Failed to download report');
+      }
+    } finally {
+      setReportDownloading(false);
+    }
+  };
+
+  // Initialize guidelines on mount
+  useEffect(() => {
+    fetchGuidelines();
+  }, []);
+
+  // Initialize session on mount
+  useEffect(() => {
+    if (!sessionId) {
+      createSession();
+    }
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -34,58 +185,68 @@ const ClinicalConsultation = ({ patientData, onBack, onLogout }) => {
   };
 
   const handleClinicalQuery = async () => {
+    if (!query.trim()) {
+      alert('Please enter a message');
+      return;
+    }
+
     if (conversationType === 'clinical' && (!editableData.disease || !editableData.medication)) {
       alert('Please ensure disease and medication fields are filled for clinical queries');
       return;
     }
 
+    // Ensure session exists
+    let currentSessionId = sessionId;
+    if (!currentSessionId) {
+      currentSessionId = await createSession();
+      if (!currentSessionId) return;
+    }
+
     setIsLoading(true);
     try {
+      // Add user message to UI immediately
+      setMessages(prev => [...prev, { role: 'user', content: query, timestamp: new Date().toISOString() }]);
+
       const payload = {
-        caseid: editableData.caseid,
-        patid: editableData.patid,
-        pname: editableData.pname,
-        dob: editableData.dob,
-        age: parseInt(editableData.age),
-        gender: editableData.gender,
-        disease: editableData.disease,
-        medication: editableData.medication,
-        query_type: queryType,
-        custom_query: query,
-        conversation_type: conversationType,
-        presenting_complaint: editableData.presenting_complaint,
-        bp: editableData.bp,
-        pulse: editableData.pulse,
-        bmi: editableData.bmi,
-        family_history: editableData.family_history,
-        social_history: editableData.social_history,
-        allergies: editableData.allergies,
+        message: query,
+        patient_name: editableData.pname || null,
+        patient_age: editableData.age ? parseInt(editableData.age) : null,
+        patient_gender: editableData.gender || null,
+        patient_medical_history: editableData.disease || null,
         patient_email: editableData.patient_email || null,
-        doctor_name: editableData.doctor_name || localStorage.getItem('doctorName') || 'Your Healthcare Provider'
+        medications: editableData.medication || null,
+        lab_results: editableData.presenting_complaint || null,
+        bp: editableData.bp || null,
+        bmi: editableData.bmi ? parseFloat(editableData.bmi) : null,
+        notify_patient: notifyPatient && editableData.patient_email ? true : false
       };
 
-      const token = localStorage.getItem('authToken');
-      const response = await axios.post(`${API_URL}/api/clinical-analysis`, payload, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
+      const response = await axios.post(
+        `${API_URL}/api/consultations/sessions/${currentSessionId}/chat`,
+        payload,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
 
+      // Parse structured response
+      const structured = response.data.structured_response;
+      setStructuredResponse(structured);
       setAnalysisResult(response.data);
+
+      // Add assistant message
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: structured,
+        timestamp: response.data.timestamp
+      }]);
+
+      setQuery('');
       setShowAnalysis(true);
 
-      if (response.data.content) {
-        setMessages(prev => [...prev, {
-          role: 'assistant',
-          content: response.data.content
-        }]);
-      }
-
     } catch (error) {
-      console.error('❌ Error caught in try-catch:', error);
-      console.error('❌ Error response:', error.response);
-      console.error('❌ Error message:', error.message);
-      alert('Failed to analyze. Please try again.');
+      console.error('Error in chat query:', error);
+      alert('Failed to process query. Please try again.');
+      // Remove the user message if request failed
+      setMessages(prev => prev.slice(0, -1));
     } finally {
       setIsLoading(false);
     }
@@ -93,50 +254,250 @@ const ClinicalConsultation = ({ patientData, onBack, onLogout }) => {
 
   const handleQuickQuery = async (quickQuery) => {
     setQuery(quickQuery);
-    setIsLoading(true);
+    
+    // Ensure session exists
+    let currentSessionId = sessionId;
+    if (!currentSessionId) {
+      currentSessionId = await createSession();
+      if (!currentSessionId) return;
+    }
 
+    setIsLoading(true);
     try {
+      // Add user message
+      setMessages(prev => [...prev, { role: 'user', content: quickQuery, timestamp: new Date().toISOString() }]);
+
       const payload = {
-        caseid: editableData.caseid,
-        patid: editableData.patid,
-        pname: editableData.pname,
-        dob: editableData.dob,
-        age: parseInt(editableData.age),
-        gender: editableData.gender,
-        disease: editableData.disease,
-        medication: editableData.medication,
-        query_type: queryType,
-        custom_query: quickQuery,
-        conversation_type: conversationType,
-        presenting_complaint: editableData.presenting_complaint,
-        bp: editableData.bp,
-        pulse: editableData.pulse,
-        bmi: editableData.bmi,
-        family_history: editableData.family_history,
-        social_history: editableData.social_history,
-        allergies: editableData.allergies,
+        message: quickQuery,
+        patient_name: editableData.pname || null,
+        patient_age: editableData.age ? parseInt(editableData.age) : null,
+        patient_gender: editableData.gender || null,
+        patient_medical_history: editableData.disease || null,
         patient_email: editableData.patient_email || null,
-        doctor_name: editableData.doctor_name || localStorage.getItem('doctorName') || 'Your Healthcare Provider'
+        medications: editableData.medication || null,
+        lab_results: editableData.presenting_complaint || null,
+        bp: editableData.bp || null,
+        bmi: editableData.bmi ? parseFloat(editableData.bmi) : null,
+        notify_patient: false  // Quick queries don't notify by default
       };
 
-      const quickToken = localStorage.getItem('authToken');
-      const response = await axios.post(`${API_URL}/api/clinical-analysis`, payload, {
-        headers: {
-          Authorization: `Bearer ${quickToken}`
-        }
-      });
+      const response = await axios.post(
+        `${API_URL}/api/consultations/sessions/${currentSessionId}/chat`,
+        payload,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
 
-      if (response.data.content) {
-        setMessages(prev => [...prev,
-          { role: 'user', content: quickQuery },
-          { role: 'assistant', content: response.data.content }
-        ]);
-      }
+      const structured = response.data.structured_response;
+      setStructuredResponse(structured);
+      setAnalysisResult(response.data);
+
+      // Add assistant message
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: structured,
+        timestamp: response.data.timestamp
+      }]);
+
+      setQuery('');
+      setShowAnalysis(true);
+
     } catch (error) {
       console.error('Quick query error:', error);
+      setMessages(prev => prev.slice(0, -1));
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // ============ NEW: Structured Response Rendering Components ============
+  
+  const SafetyFlagCard = ({ flags }) => {
+    if (!flags || flags.length === 0) return null;
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-red-50 border-2 border-red-200 rounded-xl p-4 mb-4"
+      >
+        <div className="flex items-start gap-3">
+          <div className="bg-red-500 text-white rounded-full p-2 flex-shrink-0 mt-0.5">
+            <FiAlertCircle size={18} />
+          </div>
+          <div className="flex-1">
+            <h3 className="font-bold text-red-700 mb-2">⚠️ CRITICAL SAFETY FLAGS</h3>
+            <div className="space-y-1">
+              {flags.map((flag, idx) => (
+                <p key={idx} className="text-sm text-red-700">{flag}</p>
+              ))}
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    );
+  };
+
+  const DrugInteractionCard = ({ interactions }) => {
+    if (!interactions || interactions.length === 0) return null;
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 mb-4"
+      >
+        <div className="flex items-start gap-3">
+          <div className="bg-amber-500 text-white rounded-full p-2 flex-shrink-0 mt-0.5">
+            <FiAlertTriangle size={18} />
+          </div>
+          <div className="flex-1">
+            <h3 className="font-bold text-amber-700 mb-2">🔄 Drug Interactions</h3>
+            <div className="space-y-2">
+              {interactions.map((interaction, idx) => (
+                <p key={idx} className="text-sm text-amber-700">{interaction}</p>
+              ))}
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    );
+  };
+
+  const StructuredResponseRenderer = ({ response }) => {
+    if (!response) return null;
+
+    const renderRiskLevel = (level) => {
+      const config = {
+        critical: { bg: 'bg-red-100', border: 'border-red-300', text: 'text-red-700', icon: '🔴' },
+        high: { bg: 'bg-orange-100', border: 'border-orange-300', text: 'text-orange-700', icon: '🟠' },
+        moderate: { bg: 'bg-yellow-100', border: 'border-yellow-300', text: 'text-yellow-700', icon: '🟡' },
+        low: { bg: 'bg-green-100', border: 'border-green-300', text: 'text-green-700', icon: '🟢' }
+      };
+      const c = config[level?.toLowerCase()] || config.moderate;
+      return (
+        <div className={`${c.bg} border ${c.border} rounded-lg p-3 ${c.text} text-sm font-semibold`}>
+          {c.icon} Risk Level: {level?.toUpperCase() || 'MODERATE'}
+        </div>
+      );
+    };
+
+    return (
+      <div className="space-y-4">
+        {/* Safety Flags - ALWAYS FIRST */}
+        {response.safety_flags && <SafetyFlagCard flags={response.safety_flags} />}
+
+        {/* Drug Interactions - SECOND */}
+        {response.drug_interactions && <DrugInteractionCard interactions={response.drug_interactions} />}
+
+        {/* Patient Card */}
+        {response.show_patient_card && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h4 className="font-bold text-blue-900 mb-2">👤 Patient Summary</h4>
+            <p className="text-sm text-blue-800">{editableData.pname}, {editableData.age} years old, {editableData.gender}</p>
+            {editableData.disease && <p className="text-sm text-blue-800">Condition: {editableData.disease}</p>}
+          </div>
+        )}
+
+        {/* Risk Level */}
+        {response.risk_level && renderRiskLevel(response.risk_level)}
+
+        {/* Clinical Summary */}
+        {response.clinical_summary && (
+          <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+            <h4 className="font-bold text-purple-900 mb-2">📋 Clinical Summary</h4>
+            <p className="text-sm text-purple-800 leading-relaxed">{response.clinical_summary}</p>
+          </div>
+        )}
+
+        {/* Assessment */}
+        {response.assessment && response.assessment.length > 0 && (
+          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+            <h4 className="font-bold text-indigo-900 mb-2">🔍 Assessment</h4>
+            <ul className="space-y-1">
+              {response.assessment.map((item, idx) => (
+                <li key={idx} className="text-sm text-indigo-800 flex gap-2">
+                  <span className="text-indigo-500 font-bold">•</span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Recommendations */}
+        {response.recommendations && response.recommendations.length > 0 && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <h4 className="font-bold text-green-900 mb-2">💡 Recommendations</h4>
+            <ul className="space-y-1">
+              {response.recommendations.map((rec, idx) => (
+                <li key={idx} className="text-sm text-green-800 flex gap-2">
+                  <span className="text-green-500 font-bold">✓</span>
+                  <span>{rec}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Medications */}
+        {response.medications && response.medications.length > 0 && (
+          <div className="bg-teal-50 border border-teal-200 rounded-lg p-4">
+            <h4 className="font-bold text-teal-900 mb-2">💊 Medications</h4>
+            <ul className="space-y-1">
+              {response.medications.map((med, idx) => (
+                <li key={idx} className="text-sm text-teal-800 flex gap-2">
+                  <span className="text-teal-500 font-bold">•</span>
+                  <span>{med}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Risk Details */}
+        {response.risk_details && (
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+            <h4 className="font-bold text-orange-900 mb-2">📊 Risk Details</h4>
+            <p className="text-sm text-orange-800">{response.risk_details}</p>
+          </div>
+        )}
+
+        {/* Lab Interpretation */}
+        {response.lab_interpretation && (
+          <div className="bg-cyan-50 border border-cyan-200 rounded-lg p-4">
+            <h4 className="font-bold text-cyan-900 mb-2">🧪 Lab Interpretation</h4>
+            <p className="text-sm text-cyan-800">{response.lab_interpretation}</p>
+          </div>
+        )}
+
+        {/* Follow-up Plan */}
+        {response.follow_up && (
+          <div className="bg-pink-50 border border-pink-200 rounded-lg p-4">
+            <h4 className="font-bold text-pink-900 mb-2">📅 Follow-up Plan</h4>
+            <p className="text-sm text-pink-800">{response.follow_up}</p>
+          </div>
+        )}
+
+        {/* Guideline References */}
+        {response.guideline_references && response.guideline_references.length > 0 && (
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <h4 className="font-bold text-gray-900 mb-2">📚 Clinical Guidelines</h4>
+            <div className="flex flex-wrap gap-2">
+              {response.guideline_references.map((ref, idx) => (
+                <span key={idx} className="inline-block bg-white border border-gray-300 rounded-full px-3 py-1 text-xs font-medium text-gray-700">
+                  {ref}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* General Response (for non-clinical) */}
+        {response.general_response && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <p className="text-sm text-blue-900 leading-relaxed">{response.general_response}</p>
+          </div>
+        )}
+      </div>
+    );
   };
 
   const getDecisionConfig = (decision) => {
@@ -432,34 +793,111 @@ const ClinicalConsultation = ({ patientData, onBack, onLogout }) => {
           {/* Right Column - AI Analysis & Chat */}
           <div className="lg:col-span-2 space-y-4">
 
+            {/* NEW: Guidelines Badge */}
+            {guidelines && (
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-indigo-200 rounded-xl p-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FiBook className="text-indigo-600" size={18} />
+                  <div>
+                    <p className="text-sm font-semibold text-indigo-900">Active Clinical Guidelines</p>
+                    <p className="text-xs text-indigo-700">{guidelines.total_sources} sources • v{guidelines.version?.split('v')[1] || '2026'}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowSessions(!showSessions)}
+                  className="px-3 py-1 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700 transition-colors"
+                >
+                  Sessions ({sessions.length})
+                </button>
+              </div>
+            )}
+
+            {/* NEW: Sessions Panel */}
             <AnimatePresence>
-              {showAnalysis && analysisResult && analysisResult.content && (
+              {showSessions && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className="bg-white rounded-xl shadow-lg border border-gray-200 p-4"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-bold text-gray-900">Consultation Sessions</h3>
+                    <button onClick={() => setShowSessions(false)} className="p-1 hover:bg-gray-100 rounded">
+                      <FiX size={18} />
+                    </button>
+                  </div>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {sessions.length === 0 ? (
+                      <p className="text-sm text-gray-500">No previous sessions</p>
+                    ) : (
+                      sessions.map(s => (
+                        <div key={s.id} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">{s.title}</p>
+                            <p className="text-xs text-gray-500">{s.message_count} messages</p>
+                          </div>
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => loadSession(s.id)}
+                              className="px-3 py-1 bg-purple-100 text-purple-700 text-xs rounded hover:bg-purple-200 transition-colors"
+                            >
+                              Load
+                            </button>
+                            <button
+                              onClick={() => deleteSession(s.id)}
+                              className="px-2 py-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                            >
+                              <FiX size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <button
+                    onClick={createSession}
+                    className="w-full mt-3 px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 transition-colors"
+                  >
+                    + New Session
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* NEW: Structured Analysis Result */}
+            <AnimatePresence>
+              {showAnalysis && structuredResponse && (
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden"
                 >
-                  <div className="bg-purple-400 px-6 py-4 text-white flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-                      <FiCheckCircle className="text-xl" />
+                  <div className="bg-gradient-to-r from-purple-400 to-indigo-500 px-6 py-5 text-white flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                        <FiCheckCircle className="text-xl" />
+                      </div>
+                      <div>
+                        <h2 className="text-lg font-bold">Clinical Analysis</h2>
+                        <p className="text-xs text-purple-100">
+                          {structuredResponse.response_type || 'Analysis'} • {new Date(analysisResult.timestamp).toLocaleTimeString()}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h2 className="text-lg font-bold">AI Clinical Analysis</h2>
-                      <p className="text-xs text-purple-100">
-                        {analysisResult.mode || 'Standard Mode'} •{' '}
-                        {analysisResult.query_type || queryType}
-                      </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={downloadReport}
+                        disabled={reportDownloading}
+                        className="px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-colors flex items-center gap-2 text-sm font-medium disabled:opacity-50"
+                      >
+                        <FiDownload size={16} />
+                        {reportDownloading ? 'Downloading...' : 'PDF Report'}
+                      </button>
                     </div>
                   </div>
-                  <div className="p-6">
-                    <p className="text-gray-700 leading-relaxed whitespace-pre-wrap text-sm">
-                      {analysisResult.content}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-4">
-                      {analysisResult.timestamp
-                        ? new Date(analysisResult.timestamp).toLocaleString()
-                        : ''}
-                    </p>
+                  <div className="p-6 max-h-96 overflow-y-auto">
+                    <StructuredResponseRenderer response={structuredResponse} />
                   </div>
                 </motion.div>
               )}
@@ -478,6 +916,25 @@ const ClinicalConsultation = ({ patientData, onBack, onLogout }) => {
                   AI Clinical Assistant
                 </h2>
                 <p className="text-xs text-purple-100 mt-1">Ask questions about this patient's case</p>
+              </div>
+
+              {/* NEW: Email Notification Toggle */}
+              <div className="p-4 bg-blue-50 border-b border-blue-200">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={notifyPatient}
+                    onChange={(e) => setNotifyPatient(e.target.checked)}
+                    className="w-4 h-4 accent-blue-600"
+                  />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-blue-900">Notify Patient via Email</p>
+                    <p className="text-xs text-blue-700">
+                      {editableData.patient_email ? `${editableData.patient_email}` : 'Add patient email above'}
+                    </p>
+                  </div>
+                  <FiMail className="text-blue-600" size={18} />
+                </label>
               </div>
 
               {/* Conversation Type Selector */}
@@ -569,15 +1026,15 @@ const ClinicalConsultation = ({ patientData, onBack, onLogout }) => {
                         animate={{ opacity: 1, y: 0 }}
                         className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                       >
-                        <div
-                          className={`max-w-[80%] rounded-2xl px-4 py-3 ${
-                            msg.role === 'user'
-                              ? 'bg-indigo-600 text-white'
-                              : 'bg-white border border-gray-200 text-gray-800'
-                          }`}
-                        >
-                          <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
-                        </div>
+                        {msg.role === 'user' ? (
+                          <div className="max-w-[80%] rounded-2xl px-4 py-3 bg-indigo-600 text-white">
+                            <p className="text-sm leading-relaxed">{msg.content}</p>
+                          </div>
+                        ) : (
+                          <div className="max-w-[95%] bg-white border border-gray-200 rounded-2xl p-4">
+                            <StructuredResponseRenderer response={msg.content} />
+                          </div>
+                        )}
                       </motion.div>
                     ))}
                   </div>
