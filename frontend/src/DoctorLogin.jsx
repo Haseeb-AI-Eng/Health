@@ -336,7 +336,7 @@ const DoctorLogin = ({ onLoginSuccess }) => {
                 height: '110px', 
                 width: 'auto', 
                 display: 'block',
-                filter: 'invert(1) hue-rotate(180deg) brightness(1.2)',
+                filter: 'invert(1) hue-rotate(180deg) brightness(1.0)',
                 transform: 'scaleY(1.4)' /* Stretches the logo upwards */
               }} />
           </div>
