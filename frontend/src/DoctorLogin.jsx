@@ -214,8 +214,8 @@ const DoctorLogin = ({ onLoginSuccess }) => {
         /* Arrow image (Purple Logo) — positioned left of card, above content */
         .arrow-wrap {
           position: absolute;
-          right: 440px;              
-          top: 15px;                 /* Moved up closer to the hero boundary */
+          right: 440px;
+          top: -1px;                 /* Moved slightly higher within the content area */
           z-index: 31;
           display: flex;
           align-items: center;
@@ -333,11 +333,10 @@ const DoctorLogin = ({ onLoginSuccess }) => {
           <div className="arrow-wrap">
             <img src={ARROW_IMG} alt=""
               style={{ 
-                height: '110px', 
+                height: '180px', 
                 width: 'auto', 
                 display: 'block',
                 filter: 'invert(1) hue-rotate(180deg) brightness(1.0)',
-                transform: 'scaleY(1.4)' /* Stretches the logo upwards */
               }} />
           </div>
         </section>
