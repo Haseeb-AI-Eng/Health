@@ -1,21 +1,15 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import {
-  FiUser, FiLock, FiAlertCircle, FiCheckCircle,
-  FiEye, FiEyeOff, FiArrowRight
-} from 'react-icons/fi';
 import axios from 'axios';
 import { API_URL } from './apiConfig';
-
 
 const DEFAULT_NAME = 'DrAdmin';
 const DEFAULT_PASSWORD = 'Doctor@1122';
 
 const DoctorLogin = ({ onLoginSuccess }) => {
   const [isLoading, setIsLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const [loginForm, setLoginForm] = useState({
     name: DEFAULT_NAME,
@@ -45,7 +39,7 @@ const DoctorLogin = ({ onLoginSuccess }) => {
       localStorage.setItem('doctorName', response.data.doctor.name);
       localStorage.setItem('doctorEmail', response.data.doctor.email);
 
-      setSuccess('✅ Login successful! Redirecting...');
+      setSuccess('✓ Login successful! Redirecting...');
       setTimeout(() => {
         onLoginSuccess(response.data.access_token, response.data.doctor);
       }, 1500);
@@ -53,256 +47,408 @@ const DoctorLogin = ({ onLoginSuccess }) => {
     } catch (err) {
       const detail = err.response?.data?.detail;
       if (err.response?.status === 401) {
-        setError(`❌ ${typeof detail === 'string' ? detail : 'Invalid credentials. Please check your name and password.'}`);
+        setError(typeof detail === 'string' ? detail : 'Invalid credentials.');
       } else if (err.response?.status === 403) {
         const msg = typeof detail === 'object' ? detail.message : detail;
-        setError(`⚠️ ${msg || 'Account not active. Contact support.'}`);
+        setError(msg || 'Account not active.');
       } else if (err.response?.status === 404) {
-        setError('❌ Doctor account not found.');
+        setError('Doctor account not found.');
       } else {
-        setError('❌ Login failed. Please try again.');
+        setError('Login failed. Please try again.');
       }
-      console.error('Login error:', err);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const fillDefaults = () => {
-    setLoginForm({ name: DEFAULT_NAME, password: DEFAULT_PASSWORD });
-    setError('');
-  };
-
   return (
-    <div className="min-h-screen bg-purple-400 flex items-center justify-center p-4">
-      {/* Background decorations */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-20 left-10 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
-        <div className="absolute top-40 right-10 w-72 h-72 bg-purple-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000"></div>
-        <div className="absolute bottom-20 left-1/2 w-72 h-72 bg-purple-400 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-4000"></div>
-      </div>
-
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5 }}
-        className="relative w-full max-w-md"
-      >
-        {/* Card */}
-        <div className="bg-teal-100 rounded-2xl shadow-2xl overflow-hidden border-4 border-purple-400">
-          {/* Header */}
-          <div className="bg-purple-400 p-8 text-white">
-            <div className="flex items-center justify-center mb-4">
-              <img src="/myimage.png" alt="DiabAssist Logo" className="w-24 h-24 object-cover shadow-lg" />
-            </div>
-            <h1 className="text-3xl font-bold text-center">DiabAssist</h1>
-            <p className="text-center text-teal-100 text-sm mt-2">Advanced Clinical Decision Support System</p>
-            <p className="text-center text-teal-200 text-xs mt-1">Doctor Portal</p>
-          </div>
-
-          {/* Form Container */}
-          <div className="p-8">
-            {/* Error Message */}
-            <AnimatePresence>
-              {error && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="mb-6 p-4 bg-red-100 border-2 border-red-400 rounded-xl flex items-start gap-3"
-                >
-                  <FiAlertCircle className="text-red-600 text-lg flex-shrink-0 mt-0.5" />
-                  <p className="text-red-800 text-sm">{error}</p>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Success Message */}
-            <AnimatePresence>
-              {success && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="mb-6 p-4 bg-green-100 border-2 border-green-400 rounded-xl flex items-start gap-3"
-                >
-                  <FiCheckCircle className="text-green-600 text-lg flex-shrink-0 mt-0.5" />
-                  <p className="text-green-800 text-sm">{success}</p>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Login Form */}
-            <motion.form
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.2 }}
-              onSubmit={handleLogin}
-              className="space-y-6"
-            >
-              {/* Doctor Name */}
-              <div>
-                <label className="block text-sm font-medium text-purple-900 mb-2">
-                  <FiUser className="inline mr-2" />
-                  Doctor Name
-                </label>
-                <input
-                  type="text"
-                  name="name"
-                  value={loginForm.name}
-                  onChange={handleChange}
-                  placeholder="e.g., DrAdmin"
-                  className="w-full px-4 py-3 border-2 border-purple-400 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent transition-all bg-teal-50 text-purple-900"
-                  required
-                  autoComplete="off"
-                />
-              </div>
-
-              {/* Password */}
-              <div>
-                <label className="block text-sm font-medium text-purple-900 mb-2">
-                  <FiLock className="inline mr-2" />
-                  Password
-                </label>
-                <div className="relative">
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    name="password"
-                    value={loginForm.password}
-                    onChange={handleChange}
-                    placeholder="••••••••"
-                    className="w-full px-4 py-3 border-2 border-purple-400 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent transition-all bg-teal-50 text-purple-900"
-                    required
-                    autoComplete="current-password"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-3.5 text-purple-600 hover:text-purple-800 transition-colors"
-                  >
-                    {showPassword ? <FiEyeOff /> : <FiEye />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Login Button */}
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full mt-6 bg-purple-400 text-white font-semibold py-3.5 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg border-2 border-teal-700"
-              >
-                {isLoading ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    Authenticating...
-                  </>
-                ) : (
-                  <>
-                    Login to Portal
-                    <FiArrowRight />
-                  </>
-                )}
-              </button>
-
-              {/* Demo Credentials */}
-              <div className="mt-6 p-4 bg-teal-50 border-2 border-purple-300 rounded-xl">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-semibold text-purple-800">Default Credentials:</p>
-                  <button
-                    type="button"
-                    onClick={fillDefaults}
-                    className="text-xs text-purple-600 hover:text-purple-900 underline font-medium"
-                  >
-                    Auto-fill
-                  </button>
-                </div>
-                <p className="text-xs text-purple-700">
-                  Name:{' '}
-                  <span className="font-mono bg-white px-2 py-0.5 rounded border border-purple-300">
-                    {DEFAULT_NAME}
-                  </span>
-                </p>
-                <p className="text-xs text-purple-700 mt-1">
-                  Password:{' '}
-                  <span className="font-mono bg-white px-2 py-0.5 rounded border border-purple-300">
-                    {DEFAULT_PASSWORD}
-                  </span>
-                </p>
-                <p className="text-xs text-purple-500 mt-2 italic">
-                  Fields are pre-filled — just click Login.
-                </p>
-              </div>
-
-              {/* Signup Link */}
-              <div className="mt-4 text-center">
-                <p className="text-sm text-purple-700">
-                  Don't have an account?{' '}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      localStorage.setItem('navigateTo', 'signup');
-                      window.location.reload();
-                    }}
-                    className="text-purple-900 font-semibold hover:underline"
-                  >
-                    Register as Doctor
-                  </button>
-                </p>
-              </div>
-            </motion.form>
-
-            <p className="text-center text-purple-700 text-xs mt-8">
-              AI-Powered Clinical Decision Support System
-            </p>
-          </div>
-        </div>
-
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
-          className="text-center text-white text-sm mt-6 font-semibold"
-        >
-          Secure access for authorized medical professionals only
-        </motion.p>
-
-        {/* Ad Section */}
-        <div className="mt-6">
-          <div className="bg-white/90 backdrop-blur-sm rounded-lg p-3 border border-white/30 shadow-lg">
-            <a href="#" className="block group" onClick={(e) => e.preventDefault()}>
-              <div className="flex items-center gap-3 py-1">
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className="text-[10px] bg-white/50 text-purple-900 px-1.5 py-0.5 rounded font-medium">Ad</span>
-                  <div className="w-20 h-8 rounded overflow-hidden flex-shrink-0">
-                    <img src="/edited-photo.png" alt="EI Logo" className="w-full h-full object-cover" />
-                  </div>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-purple-900 group-hover:text-purple-950 truncate">EI Health Solutions</p>
-                  <p className="text-xs text-purple-800 truncate">Advanced Medical Technology for Modern Healthcare</p>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className="text-xs text-purple-700 group-hover:text-purple-900 transition-colors">Learn More</span>
-                  <svg className="w-4 h-4 text-purple-700 group-hover:text-purple-900 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </div>
-              </div>
-            </a>
-          </div>
-        </div>
-      </motion.div>   
-
+    <div style={{ fontFamily: "'Myriad Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif" }}>
       <style>{`
-        @keyframes blob {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          33% { transform: translate(30px, -50px) scale(1.1); }
-          66% { transform: translate(-20px, 20px) scale(0.9); }
+        * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
         }
-        .animate-blob { animation: blob 7s infinite; }
-        .animation-delay-2000 { animation-delay: 2s; }
-        .animation-delay-4000 { animation-delay: 4s; }
+        
+        html, body {
+          height: 100%;
+          width: 100%;
+          overflow: hidden;
+        }
+
+        body {
+          background-color: #ffffff;
+          min-height: 100vh;
+          font-family: 'Myriad Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+        }
+
+        #root {
+          height: 100vh;
+          width: 100%;
+          overflow: hidden;
+        }
+
+        .login-wrapper {
+          height: 100vh;
+          width: 100%;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+        }
+
+        .header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          padding: 10px 40px;
+        }
+
+        .logo {
+          font-size: 42px;
+          color: #1a1a2e;
+          font-weight: 700;
+          font-family: 'Myriad Pro', sans-serif;
+        }
+
+        .logo-light {
+          font-weight: 300;
+          font-family: 'Myriad Pro', sans-serif;
+        }
+
+        .header-badge {
+          text-align: right;
+        }
+
+        .badge-title {
+          background-color: #00a19a;
+          color: white;
+          padding: 8px 16px;
+          font-size: 24px;
+          font-weight: 600;
+          letter-spacing: 1px;
+          font-family: 'Myriad Pro', sans-serif;
+        }
+
+        .badge-subtitle {
+          color: #1a1a2e;
+          font-size: 12px;
+          font-weight: 600;
+          letter-spacing: 0.5px;
+          margin-top: 8px;
+          font-family: 'Myriad Pro', sans-serif;
+        }
+
+        .hero {
+          position: relative;
+          flex: 1;
+          background-image: url('https://hebbkx1anhila5yf.public.blob.vercel-storage.com/987-Zuxm3zEuUneafXZ8dD3P53yxuU7Gir.jpeg');
+          background-size: cover;
+          background-position: center top;
+          background-repeat: no-repeat;
+          image-rendering: crisp-edges;
+          filter: brightness(1.12) contrast(1.15) saturate(1.1);
+        }
+
+        .login-card {
+          position: absolute;
+          right: 46px;
+          top: 200px;
+          background: white;
+          padding: 30px;
+          width: 340px;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+          border-radius: 8px;
+          z-index: 10;
+        }
+
+        .login-title {
+          color: #00a19a;
+          font-size: 24px;
+          font-weight: 600;
+          margin-bottom: 20px;
+          font-family: 'Myriad Pro', sans-serif;
+        }
+
+        .form-group {
+          margin-bottom: 15px;
+        }
+
+        .form-label {
+          display: block;
+          font-size: 12px;
+          color: #666;
+          margin-bottom: 5px;
+          font-family: 'Myriad Pro', sans-serif;
+        }
+
+        .form-input {
+          width: 100%;
+          padding: 10px;
+          border: 1px solid #ddd;
+          font-size: 14px;
+          outline: none;
+          border-radius: 4px;
+          font-family: 'Myriad Pro', sans-serif;
+        }
+
+        .password-field .form-input {
+          padding-right: 35px;
+        }
+
+        .form-input:focus {
+          border-color: #00a19a;
+          box-shadow: 0 0 0 2px rgba(0, 161, 154, 0.1);
+        }
+
+        .password-field {
+          position: relative;
+        }
+
+        .password-toggle {
+          position: absolute;
+          right: 10px;
+          top: 50%;
+          transform: translateY(-50%);
+          background: none;
+          border: none;
+          cursor: pointer;
+          color: #666;
+          font-size: 18px;
+          padding: 5px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: color 0.2s;
+        }
+
+        .password-toggle:hover {
+          color: #00a19a;
+        }
+
+        .submit-btn {
+          width: 100%;
+          padding: 12px;
+          background: linear-gradient(to right, #8b5cf6, #d946ef);
+          color: white;
+          border: none;
+          font-size: 14px;
+          font-weight: 500;
+          cursor: pointer;
+          margin-top: 10px;
+          border-radius: 4px;
+          transition: opacity 0.2s;
+          font-family: 'Myriad Pro', sans-serif;
+        }
+
+        .submit-btn:hover {
+          opacity: 0.9;
+        }
+
+        .submit-btn:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
+        .signup-link {
+          display: block;
+          text-align: right;
+          margin-top: 15px;
+          font-size: 12px;
+          color: #666;
+          font-family: 'Myriad Pro', sans-serif;
+        }
+
+        .signup-link a {
+          color: #00a19a;
+          text-decoration: none;
+          cursor: pointer;
+          font-family: 'Myriad Pro', sans-serif;
+        }
+
+        .signup-link a:hover {
+          text-decoration: underline;
+        }
+
+        .dna-icon {
+          position: absolute;
+          right: 340px;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 60px;
+          height: 120px;
+        }
+
+        .content {
+          padding: 15px 40px;
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          background: white;
+          flex-shrink: 0;
+        }
+
+        .welcome-text {
+          font-size: 14px;
+          color: #333;
+          max-width: 500px;
+          line-height: 1.4;
+          font-family: 'Myriad Pro', sans-serif;
+        }
+
+        .footer {
+          padding: 10px 40px;
+          text-align: center;
+          background: white;
+          flex-shrink: 0;
+        }
+
+        .footer-links {
+          display: flex;
+          justify-content: center;
+          gap: 10px;
+          font-size: 12px;
+          color: #666;
+          font-family: 'Myriad Pro', sans-serif;
+        }
+
+        .footer-links a {
+          color: #666;
+          text-decoration: none;
+          font-family: 'Myriad Pro', sans-serif;
+        }
+
+        .footer-links a:hover {
+          color: #00a19a;
+        }
+
+        .footer-links span {
+          color: #ccc;
+        }
+
+        .error-message {
+          color: #dc2626;
+          font-size: 12px;
+          padding: 8px;
+          background-color: #fee2e2;
+          border: 1px solid #fecaca;
+          border-radius: 4px;
+          margin-bottom: 10px;
+          font-family: 'Myriad Pro', sans-serif;
+        }
+
+        .success-message {
+          color: #059669;
+          font-size: 12px;
+          padding: 8px;
+          background-color: #d1fae5;
+          border: 1px solid #a7f3d0;
+          border-radius: 4px;
+          margin-bottom: 10px;
+          font-family: 'Myriad Pro', sans-serif;
+        }
       `}</style>
+
+      {/* Hero Section */}
+      <div className="login-wrapper">
+        <section className="hero">
+        {/* DNA Icon SVG */}
+        <svg className="dna-icon" viewBox="0 0 60 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M30 0 C45 20, 15 40, 30 60 C45 80, 15 100, 30 120" stroke="url(#gradient1)" strokeWidth="4" fill="none"/>
+          <path d="M30 0 C15 20, 45 40, 30 60 C15 80, 45 100, 30 120" stroke="url(#gradient2)" strokeWidth="4" fill="none"/>
+          <line x1="18" y1="15" x2="42" y2="15" stroke="#00a19a" strokeWidth="2"/>
+          <line x1="15" y1="30" x2="45" y2="30" stroke="#00a19a" strokeWidth="2"/>
+          <line x1="18" y1="45" x2="42" y2="45" stroke="#8b5cf6" strokeWidth="2"/>
+          <line x1="15" y1="60" x2="45" y2="60" stroke="#8b5cf6" strokeWidth="2"/>
+          <line x1="18" y1="75" x2="42" y2="75" stroke="#d946ef" strokeWidth="2"/>
+          <line x1="15" y1="90" x2="45" y2="90" stroke="#d946ef" strokeWidth="2"/>
+          <line x1="18" y1="105" x2="42" y2="105" stroke="#d946ef" strokeWidth="2"/>
+          <defs>
+            <linearGradient id="gradient1" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#00a19a"/>
+              <stop offset="100%" stopColor="#d946ef"/>
+            </linearGradient>
+            <linearGradient id="gradient2" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#00a19a"/>
+              <stop offset="50%" stopColor="#8b5cf6"/>
+              <stop offset="100%" stopColor="#d946ef"/>
+            </linearGradient>
+          </defs>
+        </svg>
+
+        {/* Login Card */}
+        <div className="login-card">
+          <h2 className="login-title">Login</h2>
+          
+          {error && <div className="error-message">{error}</div>}
+          {success && <div className="success-message">{success}</div>}
+
+          <form onSubmit={handleLogin}>
+            <div className="form-group">
+              <label className="form-label">Email address</label>
+              <input
+                type="text"
+                name="name"
+                value={loginForm.name}
+                onChange={handleChange}
+                className="form-input"
+                placeholder="Dr. Username"
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Password</label>
+              <div className="password-field">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  name="password"
+                  value={loginForm.password}
+                  onChange={handleChange}
+                  className="form-input"
+                  placeholder="Password"
+                  required
+                />
+                <button
+                  type="button"
+                  className="password-toggle"
+                  onClick={() => setShowPassword(!showPassword)}
+                  title={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? "👁️" : "👁️‍🗨️"}
+                </button>
+              </div>
+            </div>
+            <button type="submit" className="submit-btn" disabled={isLoading}>
+              {isLoading ? 'Authenticating...' : 'Submit'}
+            </button>
+          </form>
+          <div className="signup-link">
+            Not Registered? <a onClick={() => {
+              localStorage.setItem('navigateTo', 'signup');
+              window.location.reload();
+            }}>Sign Up</a>
+          </div>
+        </div>
+      </section>
+
+      {/* Content Section */}
+      <section className="content">
+        <p className="welcome-text">
+          Welcome to DiabAssist, the AI-Powered, evidence-based, real-time,
+          deep-learning enabled, clinical assistance tool.
+        </p>
+      </section>
+
+      {/* Footer */}
+      <footer className="footer">
+        <div className="footer-links">
+          <a href="#">Privacy Statement</a>
+          <span>|</span>
+          <a href="#">Terms and Conditions</a>
+          <span>|</span>
+          <a href="#">Helpline</a>
+        </div>
+      </footer>
+      </div>
     </div>
   );
 };

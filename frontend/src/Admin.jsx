@@ -125,7 +125,9 @@ const Admin = ({ authToken }) => {
  };
 
  const filteredPatients = patients.filter(patient =>
- patient.user_email?.toLowerCase().includes(searchTerm.toLowerCase())
+ patient.user_email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+ patient.user_id?.toString().includes(searchTerm) ||
+ (patient.patient_name && patient.patient_name.toLowerCase().includes(searchTerm.toLowerCase()))
  );
 
  const getDaysSinceRegistration = (createdAt) => {
@@ -224,17 +226,32 @@ const Admin = ({ authToken }) => {
  </div>
 
  {/* Search */}
- <div className="p-3 border-b border-gray-100">
- <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg">
- <FiSearch className="text-gray-400" />
+ <div className="p-4 border-b border-gray-200 bg-gradient-to-br from-slate-50 to-blue-50">
+ <div className="relative group">
+ <div className="absolute left-3 top-3.5 pointer-events-none flex items-center">
+ <FiSearch className="text-purple-600 text-lg group-focus-within:text-cyan-600 transition-colors" />
+ </div>
  <input
  type="text"
- placeholder="Search patients..."
+ placeholder="Search by name, email, or ID..."
  value={searchTerm}
  onChange={(e) => setSearchTerm(e.target.value)}
- className="w-full bg-gray-50 border-0 outline-none text-sm"
+ className="w-full pl-10 pr-4 py-3 bg-white border-2 border-purple-200 rounded-xl focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-400/20 transition-all text-sm placeholder-gray-500"
  />
+ {searchTerm && (
+ <button
+ onClick={() => setSearchTerm('')}
+ className="absolute right-3 top-3.5 text-gray-400 hover:text-gray-600 transition-colors"
+ >
+ ✕
+ </button>
+ )}
  </div>
+ {searchTerm && (
+ <div className="mt-2 text-xs text-purple-600 font-medium">
+ Found {filteredPatients.length} patient{filteredPatients.length !== 1 ? 's' : ''}
+ </div>
+ )}
  </div>
 
  {/* Patient List */}
@@ -247,18 +264,24 @@ const Admin = ({ authToken }) => {
  ) : filteredPatients.length === 0 ? (
  <div className="p-6 text-center text-gray-500">
  <FiAlertCircle className="text-2xl mx-auto mb-2 text-gray-400" />
- <p>No patients found</p>
+ <p>{searchTerm ? 'No patients match your search' : 'No patients found'}</p>
  </div>
  ) : (
- <div className="space-y-1 p-2">
- {filteredPatients.map((patient) => (
- <button
+ <motion.div
+ initial={{ opacity: 0 }}
+ animate={{ opacity: 1 }}
+ className="space-y-1 p-2">
+ {filteredPatients.map((patient, idx) => (
+ <motion.button
  key={patient.id}
+ initial={{ opacity: 0, x: -10 }}
+ animate={{ opacity: 1, x: 0 }}
+ transition={{ delay: idx * 0.05 }}
  onClick={() => handleSelectPatient(patient)}
  className={`w-full text-left p-3 rounded-lg transition-all ${
  selectedPatient?.id === patient.id
- ? 'bg-teal-100 border-l-4 border-purple-600'
- : 'hover:bg-gray-50'
+ ? 'bg-gradient-to-r from-purple-100 to-blue-100 border-l-4 border-purple-600'
+ : 'hover:bg-gray-50 border-l-4 border-transparent'
  }`}
  >
  <p className="font-medium text-gray-900 text-sm truncate">
@@ -267,9 +290,9 @@ const Admin = ({ authToken }) => {
  <p className="text-xs text-gray-500 mt-1">
  Last visit: {new Date(patient.date).toLocaleDateString()}
  </p>
- </button>
+ </motion.button>
  ))}
- </div>
+ </motion.div>
  )}
  </div>
 
