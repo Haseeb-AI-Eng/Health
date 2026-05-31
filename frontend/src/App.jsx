@@ -8,18 +8,31 @@ function App() {
  const [currentScreen, setCurrentScreen] = useState('login');
  const [patientData, setPatientData] = useState(null);
 
- // Check for existing session on mount
+ // Update the browser tab title for each screen
  useEffect(() => {
- // Check if user wants to navigate to signup
- const navigateTo = localStorage.getItem('navigateTo');
- if (navigateTo === 'signup') {
- localStorage.removeItem('navigateTo');
- setCurrentScreen('signup');
- return;
+ let title = 'DiabAssist';
+ switch (currentScreen) {
+ case 'login':
+ title = 'Welcome to DiabAssist! Your AI Clinical Assistance Tool';
+ break;
+ case 'signup':
+ title = 'Create Your DiabAssist Doctor Account';
+ break;
+ case 'verification':
+ title = 'DiabAssist Patient Verification | AI Clinical Assistance Tool';
+ break;
+ case 'consultation':
+ title = 'DiabAssist Clinical Consultation | AI Clinical Assistance Tool';
+ break;
+ default:
+ title = 'DiabAssist';
  }
+ document.title = title;
+ }, [currentScreen]);
 
- const token = localStorage.getItem('authToken');
- const role = localStorage.getItem('userRole');
+ useEffect(() => {
+ const token = sessionStorage.getItem('authToken');
+ const role = sessionStorage.getItem('userRole');
  const savedPatient = localStorage.getItem('currentPatient');
 
  if (token && role === 'doctor') {
@@ -33,10 +46,10 @@ function App() {
  }, []);
 
  const handleLoginSuccess = (token, doctor) => {
- localStorage.setItem('authToken', token);
- localStorage.setItem('doctorName', doctor.name);
- localStorage.setItem('doctorEmail', doctor.email);
- localStorage.setItem('userRole', 'doctor');
+ sessionStorage.setItem('authToken', token);
+ sessionStorage.setItem('doctorName', doctor.name);
+ sessionStorage.setItem('doctorEmail', doctor.email);
+ sessionStorage.setItem('userRole', 'doctor');
  setCurrentScreen('verification');
  };
 
@@ -61,10 +74,10 @@ function App() {
  };
 
  const handleLogout = () => {
- localStorage.removeItem('authToken');
- localStorage.removeItem('userRole');
- localStorage.removeItem('doctorName');
- localStorage.removeItem('doctorEmail');
+ sessionStorage.removeItem('authToken');
+ sessionStorage.removeItem('userRole');
+ sessionStorage.removeItem('doctorName');
+ sessionStorage.removeItem('doctorEmail');
  localStorage.removeItem('currentPatient');
  setPatientData(null);
  setCurrentScreen('login');

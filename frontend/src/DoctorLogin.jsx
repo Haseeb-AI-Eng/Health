@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { API_URL } from './apiConfig';
+import AppHeader from './AppHeader';
 
 const DEFAULT_NAME = 'DrAdmin';
 const DEFAULT_PASSWORD = 'Doctor@1122';
@@ -16,6 +17,7 @@ const DoctorLogin = ({ onLoginSuccess }) => {
   const [isLoading, setIsLoading]     = useState(false);
   const [error, setError]             = useState('');
   const [success, setSuccess]         = useState('');
+  const [infoMessage, setInfoMessage] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loginForm, setLoginForm]     = useState({ name: DEFAULT_NAME, password: DEFAULT_PASSWORD });
 
@@ -33,10 +35,10 @@ const DoctorLogin = ({ onLoginSuccess }) => {
         name: loginForm.name.trim(),
         password: loginForm.password
       });
-      localStorage.setItem('authToken', response.data.access_token);
-      localStorage.setItem('userRole', 'doctor');
-      localStorage.setItem('doctorName', response.data.doctor.name);
-      localStorage.setItem('doctorEmail', response.data.doctor.email);
+      sessionStorage.setItem('authToken', response.data.access_token);
+      sessionStorage.setItem('userRole', 'doctor');
+      sessionStorage.setItem('doctorName', response.data.doctor.name);
+      sessionStorage.setItem('doctorEmail', response.data.doctor.email);
       setSuccess('✓ Login successful! Redirecting...');
       setTimeout(() => onLoginSuccess(response.data.access_token, response.data.doctor), 1500);
     } catch (err) {
@@ -265,6 +267,13 @@ const DoctorLogin = ({ onLoginSuccess }) => {
           border-radius: 4px; margin-bottom: 10px;
         }
 
+        .info-message {
+          color: #92400e; font-size: 12px; padding: 8px;
+          background: #fef3c7; border: 1px solid #fcd34d;
+          border-radius: 4px; margin-bottom: 10px;
+          white-space: pre-line;
+        }
+
         .bottom-left-decoration {
           position: fixed;
           bottom: -15px;
@@ -278,11 +287,7 @@ const DoctorLogin = ({ onLoginSuccess }) => {
 
       <div className="login-wrapper">
 
-        {/* ── HEADER ── */}
-        <header className="header">
-          <img src={LOGO_IMG}   alt="DiabAssist"           style={{ height: '58px',  width: 'auto' }} />
-          <img src={BANNER_IMG} alt="AI Clinical Assistance" style={{ height: '68px', width: 'auto' }} />
-        </header>
+        <AppHeader />
 
         {/* ── HERO — background image only, no overlays ── */}
         <section className="hero">
@@ -294,6 +299,7 @@ const DoctorLogin = ({ onLoginSuccess }) => {
 
             {error   && <div className="error-message">{error}</div>}
             {success && <div className="success-message">{success}</div>}
+            {infoMessage && <div className="info-message">{infoMessage}</div>}
 
             <form onSubmit={handleLogin}>
               <div className="form-group">
@@ -326,8 +332,9 @@ const DoctorLogin = ({ onLoginSuccess }) => {
 
             <div className="signup-link">
               Not Registered? <a onClick={() => {
-                localStorage.setItem('navigateTo', 'signup');
-                window.location.reload();
+                const message = 'Sign up disabled temporarily\nPlease contact the System Administrator';
+                setInfoMessage(message);
+                window.alert(message);
               }}>Sign Up</a>
             </div>
           </div>

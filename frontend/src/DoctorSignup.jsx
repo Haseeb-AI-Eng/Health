@@ -21,6 +21,7 @@ import {
 } from 'react-icons/fi';
 import axios from 'axios';
 import { API_URL } from './apiConfig';
+import AppHeader from './AppHeader';
 
 const DoctorSignup = ({ onSignupSuccess, onBackToLogin }) => {
  const [isLoading, setIsLoading] = useState(false);
@@ -337,6 +338,7 @@ const DoctorSignup = ({ onSignupSuccess, onBackToLogin }) => {
 
  return (
  <div className="min-h-screen bg-purple-400 flex items-center justify-center p-4">
+ <AppHeader />
  {/* Background decorations */}
  <div className="absolute inset-0 overflow-hidden">
  <div className="absolute top-20 left-10 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>

@@ -18,6 +18,7 @@ import {
 } from 'react-icons/fi';
 import axios from 'axios';
 import { API_URL } from './apiConfig';
+import AppHeader from './AppHeader';
 
 
 const PatientVerificationForm = ({ onVerificationSuccess, onCancel }) => {
@@ -82,7 +83,7 @@ const PatientVerificationForm = ({ onVerificationSuccess, onCancel }) => {
 
  const loadPatients = async () => {
  try {
- const token = localStorage.getItem('authToken');
+ const token = sessionStorage.getItem('authToken');
  const response = await axios.get(`${API_URL}/api/doctor/patients`, {
  headers: {
  Authorization: `Bearer ${token}`
@@ -134,7 +135,7 @@ const PatientVerificationForm = ({ onVerificationSuccess, onCancel }) => {
  case_notes: addPatientData.case_notes || null
  };
 
- const token = localStorage.getItem('authToken');
+ const token = sessionStorage.getItem('authToken');
  const response = await axios.post(`${API_URL}/api/doctor/patient/add`, payload, {
  headers: {
  Authorization: `Bearer ${token}`
@@ -184,7 +185,7 @@ const PatientVerificationForm = ({ onVerificationSuccess, onCancel }) => {
  setIsLoading(true);
 
  try {
- const token = localStorage.getItem('authToken');
+ const token = sessionStorage.getItem('authToken');
  const response = await axios.post(`${API_URL}/api/doctor/verify-patient`, {
  caseid: formData.caseid,
  patid: formData.patid,
@@ -223,7 +224,8 @@ const PatientVerificationForm = ({ onVerificationSuccess, onCancel }) => {
  };
 
  return (
- <div className="min-h-screen bg-purple-400 flex items-center justify-center p-4">
+ <div className="min-h-screen w-full bg-purple-400 flex flex-col items-center justify-start">
+ <AppHeader />
  {/* Background decorations */}
  <div className="absolute inset-0 overflow-hidden">
  <div className="absolute top-20 left-10 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>

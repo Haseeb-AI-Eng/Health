@@ -22,6 +22,7 @@ import {
 } from 'react-icons/fi';
 import axios from 'axios';
 import { API_URL } from './apiConfig';
+import AppHeader from './AppHeader';
 
 
 const ClinicalConsultation = ({ patientData, onBack, onLogout }) => {
@@ -48,11 +49,7 @@ const ClinicalConsultation = ({ patientData, onBack, onLogout }) => {
   const [notifyPatient, setNotifyPatient] = useState(false);
   const [reportDownloading, setReportDownloading] = useState(false);
 
-  const token = localStorage.getItem('authToken');
-
-  // ============ NEW: Session Management Functions ============
-  
-  // Create a new session
+   const token = sessionStorage.getItem('authToken');
   const createSession = async () => {
     try {
       const response = await axios.post(
@@ -539,6 +536,7 @@ const ClinicalConsultation = ({ patientData, onBack, onLogout }) => {
 
   return (
     <div className="min-h-screen bg-purple-50">
+      <AppHeader />
       {/* Top Bar */}
       <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-4">

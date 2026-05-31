@@ -21,6 +21,7 @@ import axios from 'axios';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { API_URL } from './apiConfig';
+import AppHeader from './AppHeader';
 
 
 // Helper function to strip markdown for speech
@@ -273,7 +274,7 @@ const IntelliHealthInterface = ({ patientData, onBack, onLogout }) => {
  // Falls back to current session's chatHistory so the modal still shows something useful
  const fetchPatientHistory = async () => {
  try {
- const token = localStorage.getItem('authToken');
+ const token = sessionStorage.getItem('authToken');
  const response = await axios.get(`${API_URL}/api/patient-history`, {
  params: {
  caseid: editableData.caseid,
@@ -594,7 +595,7 @@ const IntelliHealthInterface = ({ patientData, onBack, onLogout }) => {
  let historyData = [];
 
  try {
- const token = localStorage.getItem('authToken');
+ const token = sessionStorage.getItem('authToken');
  const response = await axios.get(`${API_URL}/api/patient-history`, {
  params: {
  caseid: editableData.caseid,
@@ -971,10 +972,10 @@ const IntelliHealthInterface = ({ patientData, onBack, onLogout }) => {
  pdf_text: uploadedPdfText,
  pdf_name: uploadedPdfName,
  patient_email: editableData.patient_email || null,
- doctor_name: localStorage.getItem('doctorName') || 'Your Healthcare Provider'
+ doctor_name: sessionStorage.getItem('doctorName') || 'Your Healthcare Provider'
  };
 
- const token = localStorage.getItem('authToken');
+ const token = sessionStorage.getItem('authToken');
  const response = await axios.post(`${API_URL}/api/clinical-analysis`, payload, {
  headers: {
  Authorization: `Bearer ${token}`
@@ -1111,6 +1112,7 @@ const IntelliHealthInterface = ({ patientData, onBack, onLogout }) => {
 
  return (
  <div className="min-h-screen bg-purple-400">
+ <AppHeader />
  {/* Header */}
  <div className="bg-purple-400 px-6 py-3 flex items-center justify-between shadow-2xl border-b-4 border-purple-800">
  <div className="flex items-center gap-3">
